@@ -24,7 +24,7 @@ import uuid
 from PIL import Image, ImageChops, ImageDraw, ImageStat
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
-from calibration.geometry import right_rect, PAPER_MM, assert_same_selection
+from calibration.geometry import right_rect, PAPER_MM, assert_same_selection, finite_number
 from calibration.regions import capture_rects, selection, image_names, navigation, browser_name
 
 VERSION = "0.2.0"
@@ -110,9 +110,10 @@ def write_json(path, data):
 
 
 def validate(cfg, size):
+    if not isinstance(cfg,dict):raise ValueError("Config muss ein JSON-Objekt sein.")
     def positive(key):
         value = cfg[key]
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+        if not finite_number(value) or value <= 0:
             raise ValueError(f"{key} muss eine positive endliche Zahl sein.")
 
     def rect(value, name):
@@ -149,7 +150,7 @@ def validate(cfg, size):
                 "min_after_click", "timeout_seconds", "pdf_dpi", "change_threshold",
                 "template_tolerance", "template_margin"):
         positive(key)
-    if isinstance(cfg["stable_tolerance"], bool) or not isinstance(cfg["stable_tolerance"], (int, float)) or not math.isfinite(cfg["stable_tolerance"]) or not 0 <= cfg["stable_tolerance"] < cfg["change_threshold"]:
+    if not finite_number(cfg["stable_tolerance"]) or not 0 <= cfg["stable_tolerance"] < cfg["change_threshold"]:
         raise ValueError("0 <= stable_tolerance < change_threshold erforderlich.")
     if cfg["timeout_seconds"] <= max(cfg["disabled_seconds"], cfg["stable_seconds"]) + cfg["min_after_click"]:
         raise ValueError("timeout_seconds ist fuer die Wartezeiten zu kurz.")
@@ -599,13 +600,12 @@ def build_pdf(folder, manifest, output):
 
 
 def _render_pdf(folder,manifest,output,selected=None):
-    from calibration.exports import readable_manifest, view_images, pdf_options
+    from calibration.exports import readable_manifest, view_images, pdf_options, validate_page_size
     readable_manifest(manifest)
     pdf_options(manifest["config"])
     if not manifest["pairs"]:
         return False
     cfg = manifest["config"]
-    factor = 72.0 / cfg["pdf_dpi"]
     output = Path(output)
     tmp = output.with_suffix(output.suffix + ".tmp")
     pdf = canvas.Canvas(str(tmp), pageCompression=1)
@@ -622,9 +622,10 @@ def _render_pdf(folder,manifest,output,selected=None):
         for im in images:
             w, h = im.size
             paper=cfg.get("paper_format","Original")
-            pw,ph=(w*factor,h*factor) if paper=="Original" else tuple(v*72/25.4 for v in PAPER_MM[paper])
+            pw,ph=(w*72.0/cfg["pdf_dpi"],h*72.0/cfg["pdf_dpi"]) if paper=="Original" else tuple(v*72/25.4 for v in PAPER_MM[paper])
             if paper!="Original" and cfg.get("paper_orientation","portrait")=="landscape":
                 pw,ph=ph,pw
+            validate_page_size(pw,ph)
             scale=min(pw/w,ph/h)
             pdf.setPageSize((pw,ph))
             pdf.drawImage(ImageReader(im),(pw-w*scale)/2,(ph-h*scale)/2,width=w*scale,height=h*scale)

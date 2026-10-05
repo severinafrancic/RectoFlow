@@ -30,6 +30,25 @@ import edge_capture as core
 
 
 class CalibrationV02Tests(unittest.TestCase):
+    def test_oversized_numbers_rejected_at_config_and_dom_boundaries(self):
+        from calibration.dom_picker import parse_payload
+        from calibration.geometry import measured_mapping,css_to_screen
+        cfg=json.loads((ROOT/"config.json").read_bytes())
+        for key in ("start_delay","poll_seconds","stable_seconds","disabled_seconds","min_after_click","timeout_seconds","pdf_dpi","change_threshold","template_tolerance","template_margin","stable_tolerance"):
+            bad=copy.deepcopy(cfg);bad[key]=10**400
+            with self.subTest(key=key),self.assertRaises(ValueError):core.validate(bad,(32768,32768))
+        for key in ("scroll","viewport"):
+            data=payload();data[key][0]=10**400
+            with self.subTest(dom=key),self.assertRaises(CalibrationError):parse_payload(json.dumps(data),data["token"])
+        data=payload();data["rects"]["LEFT"]["width"]=10**400
+        with self.assertRaises(CalibrationError):parse_payload(json.dumps(data),data["token"])
+        with self.assertRaises(CalibrationError):measured_mapping([[0,0],[1,0],[0,1]],[[0,0],[1,0],[0,1]],10**400)
+        with self.assertRaises(CalibrationError):css_to_screen({"left":0,"top":0,"width":10**400,"height":10},(1,1,0,0),(500,500))
+
+    def test_project_version_matches_runtime(self):
+        import tomllib
+        self.assertEqual(tomllib.loads((ROOT/"pyproject.toml").read_text())["project"]["version"],core.VERSION)
+
     def test_frozen_cli_failure_never_opens_modal_dialog(self):
         import rectoflow
         with patch.object(sys,"argv",["RectoFlow.exe","--rebuild","interrupted"]),patch.object(sys,"frozen",True,create=True),patch.object(rectoflow,"main",side_effect=ValueError("RUNNING")),patch.object(rectoflow.messagebox,"showerror") as dialog:
@@ -160,6 +179,20 @@ class CalibrationV02Tests(unittest.TestCase):
 class ProfileTests(unittest.TestCase):
     def cfg(self):return json.loads((ROOT/"config.json").read_bytes())
 
+    def test_malformed_profile_isolation_for_json_roots_and_large_numbers(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            store=ProfileStore(td);healthy=store.create("Healthy",self.cfg())
+            cases=[("profile.json",[]),("profile.json",None),("config.json",[]),("config.json",None)]
+            for key in ("pdf_dpi","start_delay","stable_tolerance"):
+                cfg=self.cfg();cfg[key]=10**400;cases.append(("config.json",cfg))
+            for filename,data in cases:
+                identifier=store.create("Malformed",self.cfg())
+                (store.path(identifier)/filename).write_text(json.dumps(data))
+            rows=store.enumerate()
+            self.assertEqual(len(rows),1+len(cases))
+            self.assertEqual([row["uuid"] for row in rows if row["ready"]],[healthy])
+
+
     def test_template_recording_is_locked_atomic_and_rejects_stale_config(self):
         from io import BytesIO
         from calibration.config_io import record_template
@@ -239,6 +272,26 @@ class ProfileTests(unittest.TestCase):
 
 
 class ExportTests(unittest.TestCase):
+    def test_original_extreme_dpi_never_completes_zero_or_infinite_page(self):
+        from calibration.exports import pdf_options
+        with self.assertRaises(ValueError):pdf_options({"pdf_dpi":10**400})
+        for dpi in (1e308,1e-320):
+            with self.subTest(dpi=dpi),tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+                folder=Path(td);manifest=self.fixture(folder);before=(folder/"manifest.json").read_bytes()
+                plan=create_plan(folder,[1],{"paper_format":"Original","pdf_dpi":dpi})
+                with self.assertRaises(ValueError):execute_plan(folder,plan)
+                result=json.loads((plan.parent/"result.json").read_bytes())
+                self.assertEqual(result["status"],"FAILED");self.assertNotIn("pdf_sha256",result)
+                self.assertFalse((plan.parent/"document.pdf").exists())
+                self.assertEqual((folder/"manifest.json").read_bytes(),before)
+                for schema in (1,2):
+                    legacy=copy.deepcopy(manifest);legacy["schema"]=schema
+                    legacy["config"].update(paper_format="Original",pdf_dpi=dpi)
+                    with self.assertRaises(ValueError):core.build_pdf(folder,legacy,folder/f"legacy-{schema}.pdf")
+                    self.assertFalse((folder/f"legacy-{schema}.pdf").exists())
+                fixed=execute_plan(folder,create_plan(folder,[1],{"paper_format":"A4","pdf_dpi":dpi}))
+                self.assertGreater(float(PdfReader(fixed).pages[0].mediabox.width),0)
+
     def fixture(self,folder,status="COMPLETE"):
         cfg=json.loads((ROOT/"config.json").read_bytes())
         cfg.update(regions=[[10,20,40,50],[70,20,45,30]],navigation_mode="none",paper_format="A4")
