@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Clarify that one, two, three or more rectangles can be selected without a fixed
+  rectangle-count limit. Replace mathematical wording in the README; capture
+  behavior is unchanged.
+
 The initial prerelease includes the independent-review fix that binds capture
 order in the final start confirmation, with regression coverage for reordered
 two-region and many-region selections.

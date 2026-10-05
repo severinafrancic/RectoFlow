@@ -40,7 +40,9 @@ export keeps the captured data for later export.
 
 ## Features
 
-- Any positive number of independently selected, ordered regions.
+- One, two, three or as many independently selected regions as you need;
+  there is no fixed limit on the number of rectangles. Add them with **+ Bereich**
+  and choose their capture order.
 - Eight resize handles, paper-aspect fitting and an editable final control preview.
 - Automatic Next with fresh UIA state or explicitly calibrated image templates.
 - Manual navigation and single-view capture without a Next button.

@@ -24,7 +24,7 @@ timing, output, count and recognition fields from that file.
 
 | Setting | Meaning |
 | --- | --- |
-| `regions` | Ordered nonempty rectangle list; no fixed two-region limit. |
+| `regions` | Ordered rectangle list: one, two, three or more; no fixed limit on rectangle count. At least one is required to capture content. |
 | `navigation_mode` | `next_button`, `manual`, or `none` (single view). |
 | `browser` | `auto`, `Edge`, `Chrome`, `Brave`, `Firefox`; selected executable must match. |
 | `button_rect`, `next_point` | Required in automatic mode; can be null in manual/single mode. |
@@ -38,6 +38,11 @@ timing, output, count and recognition fields from that file.
 | `paper_orientation` | `portrait` or `landscape`. |
 | `pdf_layout` | `separate`: each region is a page; `spread`: regions of one view share a page. |
 | `confirm_pdf_export` | Show final saved-image format/confirmation dialog. |
+
+The **+ Bereich** control adds further rectangles. `max_spreads` limits the number
+of document views captured during navigation, not the number of rectangles in a
+view. Rectangle count has no fixed application limit; available screen space,
+memory and storage still determine what a particular computer can capture.
 
 Old configurations without `regions` use `left_rect` and explicit `right_rect`,
 or the legacy equal-size adjacent fallback. The calibrator can migrate to a

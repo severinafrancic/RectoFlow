@@ -7,6 +7,9 @@ aus Brave, Edge, Firefox oder Chrome auf. Die Reihenfolge legst du selbst fest.
 Du kannst automatisch mit einem Weiter-Button blättern, manuell weiterschalten
 oder nur eine Ansicht aufnehmen. Das Papierformat kannst du am Ende wählen.
 
+Ein, zwei, drei, vier und mehr Rechtecke sind möglich. Mit **+ Bereich** fügst du
+weitere hinzu; es gibt keine feste Obergrenze für die Anzahl der Rechtecke.
+
 ## Windows starten
 
 Die portable Windows-ZIP aus den [Releases](https://github.com/severinafrancic/RectoFlow/releases)
