@@ -8,7 +8,7 @@ from pathlib import Path
 import uuid
 
 from PIL import Image, ImageChops, ImageStat
-from .geometry import PAPER_MM
+from .geometry import PAPER_MM, finite_number
 from .regions import capture_rects, image_names
 from .storage import atomic_json, exclusive, LockBusy
 
@@ -76,8 +76,19 @@ def pdf_options(cfg,overrides=None):
     if result["paper_format"] not in (*PAPER_MM,"Original") or result["paper_orientation"] not in ("portrait","landscape") or result["pdf_layout"] not in ("separate","spread"):
         raise ValueError("Ungueltige PDF-Einstellungen.")
     dpi=result["pdf_dpi"]
-    if isinstance(dpi,bool) or not isinstance(dpi,(int,float)) or not math.isfinite(dpi) or dpi<=0:raise ValueError("Ungueltige PDF-DPI.")
+    if not finite_number(dpi) or dpi<=0:raise ValueError("Ungueltige PDF-DPI.")
     return result
+
+
+def validate_page_size(width,height):
+    """Check the exact ReportLab number serialization used for PDF MediaBox."""
+    from reportlab.lib.rl_accel import fp_str
+    for value in (width,height):
+        if not finite_number(value) or value<=0:
+            raise ValueError("PDF-Seitengroesse ist nicht darstellbar; DPI oder Papierformat aendern.")
+        encoded=float(fp_str(value))
+        if not finite_number(encoded) or encoded<=0:
+            raise ValueError("PDF-Seitengroesse wuerde auf null gerundet; DPI oder Papierformat aendern.")
 
 
 def validate_plan(plan,manifest,source_hash):

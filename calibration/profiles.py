@@ -60,7 +60,7 @@ class ProfileStore:
         path=self.path(identifier)
         if path.is_symlink() or getattr(path,"is_junction",lambda:False)():raise ValueError("Profilordner darf keine Umleitung sein.")
         meta=json.loads((path/"profile.json").read_bytes())
-        if meta.get("schema")!=1 or meta.get("uuid")!=identifier or not isinstance(meta.get("name"),str) or not meta["name"].strip():
+        if not isinstance(meta,dict) or meta.get("schema")!=1 or meta.get("uuid")!=identifier or not isinstance(meta.get("name"),str) or not meta["name"].strip():
             raise ValueError("Profilmetadaten ungueltig.")
         raw=(path/"config.json").read_bytes()
         cfg=json.loads(raw.decode("utf-8-sig"));validate_profile_config(cfg)

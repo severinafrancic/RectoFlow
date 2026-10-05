@@ -1,6 +1,6 @@
 """Local file transport; single-use sessions, measured browser markers."""
 import json
-import math
+from .geometry import finite_number
 from pathlib import Path
 import time
 import uuid
@@ -74,7 +74,7 @@ def parse_payload(text, token, now=None):
         if len(data["viewport"])!=2 or len(data["scroll"])!=2 or not .25 <= data["dpr"] <= 8:
             raise ValueError("Ungueltige DOM-Skalierung.")
         for v in [data["dpr"], *data["viewport"], *data["scroll"]]:
-            if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+            if not finite_number(v):
                 raise ValueError("Ungueltige DOM-Koordinaten.")
         if not 180 <= data["viewport"][0] <= 32000 or not 180 <= data["viewport"][1] <= 32000:
             raise ValueError("Ungueltiger Viewport.")
@@ -89,7 +89,7 @@ def parse_payload(text, token, now=None):
             r = data["rects"].get(name)
             if r is not None:
                 values=[r[k] for k in ("left","top","right","bottom","width","height")]
-                if any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) for v in values) or r["width"]<=0 or r["height"]<=0 or abs(r["right"]-r["left"]-r["width"])>.01 or abs(r["bottom"]-r["top"]-r["height"])>.01:
+                if any(not finite_number(v) for v in values) or r["width"]<=0 or r["height"]<=0 or abs(r["right"]-r["left"]-r["width"])>.01 or abs(r["bottom"]-r["top"]-r["height"])>.01:
                     raise ValueError("Ungueltiges DOM-Rechteck.")
                 rects[name] = {k:r[k] for k in ("left","top","right","bottom","width","height")}
         return {k:data[k] for k in ("schema","token","created_ms","dpr","viewport","scroll","visual_scale","markers")} | {"rects":rects}

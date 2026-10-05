@@ -65,6 +65,11 @@ PNG path read → SHA-256 check → BytesIO decode/load → dimension check → 
 that decoded object. Result schema 1 links plan/manifest/PDF hashes. Plan/manifest
 changes during rendering prevent COMPLETE. Export errors/cancellation never modify
 the capture manifest. COMPLETE PDFs remain proportional and browser-neutral.
+Computed page dimensions must stay finite and positive after the exact ReportLab
+number serialization; zero/infinite MediaBoxes cannot produce COMPLETE results.
+JSON numeric validation rejects values outside finite runtime representation
+without escaping per-profile isolation. Metadata and config roots must be objects;
+one malformed profile cannot prevent discovery of valid siblings.
 
 Analysis v1: corresponding regions, RGB 64×64 LANCZOS, mean absolute channel
 difference; similarity = 1 − difference/255, view mean across every region,
