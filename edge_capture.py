@@ -197,6 +197,11 @@ class WindowsGUI:
         self.user.MonitorFromWindow.restype = W.HANDLE
         self.user.SetForegroundWindow.argtypes = [W.HWND]
         self.user.IsWindow.argtypes = [W.HWND]
+        self.user.IsWindowVisible.argtypes = [W.HWND]
+        self.user.IsIconic.argtypes = [W.HWND]
+        self.user.SetPropW.argtypes = [W.HWND,W.LPCWSTR,W.HANDLE]
+        self.user.GetPropW.argtypes = [W.HWND,W.LPCWSTR]
+        self.user.GetPropW.restype = W.HANDLE
         # DPI-Kontext vor ImageGrab/UIA/Koordinatenabfragen setzen.
         try:
             self.user.SetProcessDpiAwarenessContext.argtypes = [ctypes.c_void_p]
@@ -243,7 +248,32 @@ class WindowsGUI:
         return (r.left, r.top, r.right, r.bottom)
 
     def bind(self, check_config=True, check_calibration=True):
-        self.hwnd = self.user.GetForegroundWindow()
+        from calibration.window_picker import choose_window, inspect_window
+        selected = choose_window(self)
+        self.hwnd = selected["hwnd"]
+        live = inspect_window(self,self.hwnd)
+        if not live["ready"] or any(live[k]!=selected[k] for k in ("identity","exe","environment")):
+            raise StopRun("TARGET_WINDOW_LOST: Auswahl ist nicht mehr aktuell.")
+        self.browser = live["browser"]
+        self.bound_exe = live["exe"]
+        self.initial_geometry = tuple(live["environment"]["window_bounds"])
+        self.bound_identity = live["identity"]
+        self.bound_environment = live["environment"]
+        self.window_property = "RectoFlow-" + uuid.uuid4().hex
+        if not self.user.SetPropW(self.hwnd,self.window_property,W.HANDLE(1)):
+            raise StopRun("TARGET_WINDOW_LOST: Fenster-Lebensdauer nicht bindbar.")
+        calibrated = self.cfg.get("calibration")
+        if check_calibration and calibrated:
+            if calibrated.get("coordinate_space") != "primary_screen_physical_pixels" or calibrated.get("schema") != 1:
+                raise StopRun("RECALIBRATION_REQUIRED: unbekanntes Kalibrierungsformat.")
+            old = calibrated["target"]
+            if any(old[key] != self.bound_environment[key] for key in ("window_bounds","screen_size","dpi","monitor")):
+                raise StopRun("RECALIBRATION_REQUIRED: Fenster, Monitor oder DPI weichen von der Kalibrierung ab.")
+        self.activate_target()
+        self.guard(areas=check_config)
+        print("Gebunden an",self.browser,":",self.title(),flush=True)
+
+    def process_executable(self):
         pid = W.DWORD()
         self.user.GetWindowThreadProcessId(self.hwnd, ctypes.byref(pid))
         handle = self.kernel.OpenProcess(0x1000, False, pid.value)
@@ -256,24 +286,7 @@ class WindowsGUI:
                 raise ctypes.WinError(ctypes.get_last_error())
         finally:
             self.kernel.CloseHandle(handle)
-        try:
-            self.browser=browser_name(exe.value,self.cfg.get("browser","auto"))
-        except ValueError as error:
-            raise StopRun(str(error)) from error
-        self.initial_geometry = self.geometry()
-        self.bound_identity = self.process_identity()
-        self.bound_environment = self.environment()
-        if not self.bound_environment["monitor"]["primary"]:
-            raise StopRun("TARGET_WINDOW_LOST: Edge muss auf dem Hauptmonitor liegen.")
-        calibrated = self.cfg.get("calibration")
-        if check_calibration and calibrated:
-            if calibrated.get("coordinate_space") != "primary_screen_physical_pixels" or calibrated.get("schema") != 1:
-                raise StopRun("RECALIBRATION_REQUIRED: unbekanntes Kalibrierungsformat.")
-            old = calibrated["target"]
-            if any(old[key] != self.bound_environment[key] for key in ("window_bounds","screen_size","dpi","monitor")):
-                raise StopRun("RECALIBRATION_REQUIRED: Fenster, Monitor oder DPI weichen von der Kalibrierung ab.")
-        self.guard(areas=check_config)
-        print("Gebunden an",self.browser,":", self.title(), flush=True)
+        return exe.value
 
     def process_identity(self):
         pid = W.DWORD()
@@ -315,9 +328,33 @@ class WindowsGUI:
     def activate_target(self, *, cleanup=False):
         if not self.user.IsWindow(self.hwnd) or self.process_identity()!=self.bound_identity:
             raise StopRun("TARGET_WINDOW_LOST: Ziel-Fenster wurde geschlossen/ersetzt.")
+        self.identity_environment_check()
         self.user.SetForegroundWindow(self.hwnd)
         self.pause(.3,check_abort=not cleanup)
         self.guard(areas=False,check_abort=not cleanup)
+
+    def identity_environment_check(self):
+        if not self.user.IsWindow(self.hwnd):
+            raise StopRun("TARGET_WINDOW_LOST: Ziel geschlossen.")
+        if hasattr(self,"bound_identity") and self.process_identity()!=self.bound_identity:
+            raise StopRun("TARGET_WINDOW_LOST: Prozessidentitaet geaendert.")
+        if hasattr(self,"bound_exe") and self.process_executable()!=self.bound_exe:
+            raise StopRun("TARGET_WINDOW_LOST: Executable geaendert.")
+        if hasattr(self,"bound_exe") and (not self.user.IsWindowVisible(self.hwnd) or self.user.IsIconic(self.hwnd)):
+            raise StopRun("TARGET_WINDOW_LOST: Fenster ist nicht mehr sichtbar/bereit.")
+        if hasattr(self,"window_property") and not self.user.GetPropW(self.hwnd,self.window_property):
+            raise StopRun("TARGET_WINDOW_LOST: HWND-Lebensdauer geaendert.")
+        if hasattr(self,"bound_environment") and self.environment()!=self.bound_environment:
+            raise StopRun("RECALIBRATION_REQUIRED: Fenster, DPI oder Monitor geaendert.")
+
+    def __del__(self):
+        # Property dies with HWND; remove our own live marker when this adapter closes.
+        try:
+            if getattr(self,"window_property",None) and self.user.IsWindow(self.hwnd):
+                self.user.RemovePropW.argtypes=[W.HWND,W.LPCWSTR]
+                self.user.RemovePropW(self.hwnd,self.window_property)
+        except Exception:
+            pass
 
     def remove_dom_picker(self):
         # ESC beendet die Auswahl, darf die eigene lokale Bereinigung aber nicht
@@ -330,8 +367,9 @@ class WindowsGUI:
     def guard(self, areas=True, *, check_abort=True):
         if check_abort:
             self.abort_check()
+        self.identity_environment_check()
         if self.user.GetForegroundWindow() != self.hwnd:
-            raise StopRun("Edge hat den Fokus verloren. Keine weiteren Klicks.")
+            raise StopRun("Zielbrowser hat den Fokus verloren. Keine weiteren Klicks.")
         if self.geometry() != self.initial_geometry or self.size != (self.user.GetSystemMetrics(0), self.user.GetSystemMetrics(1)):
             raise StopRun("Fensterposition oder Bildschirmgroesse wurde geaendert.")
         if hasattr(self,"bound_identity") and self.process_identity()!=self.bound_identity:
@@ -646,8 +684,6 @@ def main():
             print(f"x={p.x:5d} y={p.y:5d}", end="\r", flush=True)
             gui.pause(0.15)
     validate(cfg, gui.size)
-    print(f"{cfg['start_delay']} Sekunden: Edge und Startseite in den Vordergrund bringen.", flush=True)
-    gui.pause(cfg["start_delay"])
     gui.bind()
     gui.park()
     gui.pause(0.5)

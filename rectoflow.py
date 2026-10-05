@@ -23,7 +23,7 @@ def self_check():
 def launcher():
     root=tk.Tk()
     root.title("RectoFlow — Bereiche aufnehmen, PDF erstellen")
-    root.geometry("640x440")
+    root.geometry("680x490")
     selected=tk.StringVar(value=str(core.config_root()/"config.json"))
     ttk.Label(root,text="RectoFlow",font=("Segoe UI",24,"bold"),padding=15).pack(anchor="w")
     ttk.Label(root,text="Ein Bereich oder beliebig viele — Brave, Edge, Firefox und Chrome.\nBereiche ordnen, mit Weiter aufnehmen, Papierformat am Ende waehlen.",padding=12,wraplength=600).pack(anchor="w")
@@ -37,6 +37,27 @@ def launcher():
         action=mode
         root.destroy()
     ttk.Button(root,text="Konfiguration waehlen",command=choose).pack(pady=5)
+    def backup_dialog():
+        from calibration.config_io import backups,restore
+        path=Path(selected.get())
+        win=tk.Toplevel(root);win.title("Config-Backups");win.geometry("680x330")
+        entries=backups(path)[:10]
+        ttk.Label(win,text="Die zehn neuesten Backups. Alle Backups bleiben auf der Festplatte erhalten.",padding=10).pack()
+        listing=tk.Listbox(win);listing.pack(fill="both",expand=True)
+        for item in entries:listing.insert("end",item.name)
+        def apply():
+            if not listing.curselection():return
+            backup=entries[listing.curselection()[0]]
+            if not messagebox.askyesno("Restore bestaetigen","Dieses Backup wiederherstellen? Die aktuelle Config wird vorher gesichert.",parent=win):return
+            try:
+                cfg=json.loads(backup.read_bytes().decode("utf-8-sig"))
+                size=core.WindowsGUI(cfg,path.parent).size
+                restore(path,backup,lambda c:core.validate(c,size))
+                messagebox.showinfo("Restore abgeschlossen","Config wiederhergestellt. Vor Aufnahme erneut kontrollieren.",parent=win)
+                win.destroy()
+            except Exception as error:messagebox.showerror("Restore fehlgeschlagen",str(error),parent=win)
+        ttk.Button(win,text="Ausgewaehltes Backup wiederherstellen",command=apply).pack(pady=8)
+    ttk.Button(root,text="Config-Backups / Wiederherstellen",command=backup_dialog).pack(pady=3)
     buttons=ttk.Frame(root,padding=10)
     buttons.pack(fill="x")
     for title,mode in (("1. Bereiche kalibrieren","--calibrate"),("2. Vorschau pruefen","--preview"),("3. Aufnahme starten","--capture"),("Gespeicherte Bilder als PDF","export")):

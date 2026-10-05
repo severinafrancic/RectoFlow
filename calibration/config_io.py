@@ -5,6 +5,9 @@ import json
 import os
 from pathlib import Path
 import tempfile
+from datetime import datetime, timezone
+import uuid
+from .storage import config_transaction, LockBusy
 
 from .geometry import CalibrationError, contains, validate_selection
 from .regions import capture_names
@@ -35,13 +38,22 @@ def updated_config(original, rects, point, target, dom, navigation_mode=None):
 
 
 def atomic_update(path, cfg, expected_digest, validator):
+    try:
+        with config_transaction(path):
+            return _atomic_update(path, cfg, expected_digest, validator)
+    except (OSError, LockBusy) as error:
+        raise CalibrationError("CONFIG_WRITE_FAILED", str(error)) from error
+
+
+def _atomic_update(path, cfg, expected_digest, validator, exact_bytes=None):
     path = Path(path)
     tmp = None
     try:
-        if hashlib.sha256(path.read_bytes()).hexdigest() != expected_digest:
+        original = path.read_bytes()
+        if hashlib.sha256(original).hexdigest() != expected_digest:
             raise CalibrationError("CONFIG_WRITE_FAILED", "Config wurde waehrend der Kalibrierung geaendert; neu starten.")
         validator(cfg)
-        data = json.dumps(cfg, ensure_ascii=False, indent=2, allow_nan=False).encode("utf-8")
+        data = exact_bytes if exact_bytes is not None else json.dumps(cfg, ensure_ascii=False, indent=2, allow_nan=False).encode("utf-8")
         # Unique Temp im selben Verzeichnis => gleicher Datentraeger fuer replace.
         with tempfile.NamedTemporaryFile(dir=path.parent, prefix=path.name + ".", suffix=".tmp", delete=False) as stream:
             tmp = Path(stream.name)
@@ -49,6 +61,14 @@ def atomic_update(path, cfg, expected_digest, validator):
             stream.flush()
             os.fsync(stream.fileno())
         validator(json.loads(tmp.read_bytes()))
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
+        backup = path.with_name(path.stem + ".backup." + stamp + "." + uuid.uuid4().hex[:8] + path.suffix)
+        with backup.open("xb") as stream:
+            stream.write(original)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if backup.read_bytes() != original:
+            raise CalibrationError("CONFIG_WRITE_FAILED", "Backup konnte nicht verifiziert werden.")
         if hashlib.sha256(path.read_bytes()).hexdigest() != expected_digest:
             raise CalibrationError("CONFIG_WRITE_FAILED", "Config-Konflikt unmittelbar vor dem Speichern.")
         os.replace(tmp, path)
@@ -59,3 +79,19 @@ def atomic_update(path, cfg, expected_digest, validator):
     finally:
         if tmp is not None and tmp.exists():
             tmp.unlink()
+
+
+def backups(path):
+    path = Path(path)
+    return sorted(path.parent.glob(path.stem + ".backup.*" + path.suffix), reverse=True)
+
+
+def restore(path, backup, validator):
+    path, backup = Path(path), Path(backup)
+    with config_transaction(path):
+        if backup.resolve() not in [p.resolve() for p in backups(path)]:
+            raise CalibrationError("CONFIG_WRITE_FAILED", "Backup gehoert nicht zu dieser Config.")
+        data = backup.read_bytes()
+        cfg = json.loads(data.decode("utf-8-sig"))
+        validator(cfg)
+        _atomic_update(path, cfg, hashlib.sha256(path.read_bytes()).hexdigest(), validator,exact_bytes=data)
