@@ -417,15 +417,12 @@ class WindowsGUI:
             import uiautomation
             self.auto = uiautomation
         else:
+            from calibration.profiles import decode_template
+            expected=tuple(self.cfg["button_rect"][2:])
             for attr, filename in (("enabled", "button_enabled.png"), ("disabled", "button_disabled.png")):
-                from io import BytesIO
                 if not hasattr(self,"template_bytes") or filename not in self.template_bytes:
                     raise StopRun("Button-Template-Snapshot fehlt; Lauf neu vorbereiten.")
-                with Image.open(BytesIO(self.template_bytes[filename])) as im:
-                    setattr(self, attr, im.convert("RGB"))
-            expected = tuple(self.cfg["button_rect"][2:])
-            if self.enabled.size != expected or self.disabled.size != expected:
-                raise ValueError("Button-Vorlagen passen nicht zu button_rect. Neu kalibrieren.")
+                setattr(self,attr,decode_template(self.template_bytes[filename],expected))
             if difference(self.enabled, self.disabled) < self.cfg["template_margin"] * 2:
                 raise ValueError("Aktive/inaktive Vorlage sind nicht deutlich unterscheidbar.")
 

@@ -26,13 +26,30 @@ def validate_profile_config(cfg):
 
 def validate_templates(cfg,templates):
     if cfg["button_mode"]=="template" and navigation(cfg)=="next_button":
-        from io import BytesIO
-        from PIL import Image
         if set(templates)!=set(TEMPLATES):raise ValueError("Beide Button-Templates werden benoetigt.")
         for data in templates.values():
-            with Image.open(BytesIO(data)) as image:
-                image.load()
-                if image.size!=tuple(cfg["button_rect"][2:]):raise ValueError("Template-Groesse ungueltig.")
+            decode_template(data,tuple(cfg["button_rect"][2:]))
+
+
+def decode_template(data,expected_size,expected_format=None):
+    """Bound decoding before load; contain Pillow data errors at the profile boundary."""
+    from io import BytesIO
+    from PIL import Image
+    try:
+        with Image.open(BytesIO(data)) as image:
+            limit=Image.MAX_IMAGE_PIXELS
+            if limit is not None and image.width*image.height>limit:
+                raise ValueError("Button-Vorlage ueberschreitet die sichere Bildgroesse.")
+            if image.size!=expected_size or (expected_format and image.format!=expected_format):
+                raise ValueError("Button-Vorlage hat ungueltiges Format oder Abmessungen.")
+            image.load()
+            return image.convert("RGB")
+    except MemoryError:
+        raise  # resource exhaustion is not an invalid-file diagnosis
+    except Exception as error:
+        # Pillow plugins expose several exception types; all data/provider failures
+        # must stay within this profile, without relaxing image-bomb protections.
+        raise ValueError("Button-Vorlage ungueltig: "+str(error)) from error
 
 
 class ProfileStore:
@@ -60,7 +77,7 @@ class ProfileStore:
         path=self.path(identifier)
         if path.is_symlink() or getattr(path,"is_junction",lambda:False)():raise ValueError("Profilordner darf keine Umleitung sein.")
         meta=json.loads((path/"profile.json").read_bytes())
-        if not isinstance(meta,dict) or meta.get("schema")!=1 or meta.get("uuid")!=identifier or not isinstance(meta.get("name"),str) or not meta["name"].strip():
+        if not isinstance(meta,dict) or type(meta.get("schema")) is not int or meta["schema"]!=1 or meta.get("uuid")!=identifier or not isinstance(meta.get("name"),str) or not meta["name"].strip():
             raise ValueError("Profilmetadaten ungueltig.")
         raw=(path/"config.json").read_bytes()
         cfg=json.loads(raw.decode("utf-8-sig"));validate_profile_config(cfg)
