@@ -19,6 +19,7 @@ from calibration.geometry import CalibrationError,validate_selection,PAPER_MM,as
 from calibration.config_io import updated_config
 from calibration.screenshot_picker import RectanglePicker
 from calibration.pdf_export import paper_preview,preview_images
+from calibration import calibration as wizard
 
 SCRATCH=Path(os.environ.get("EDGE_CAPTURE_TEST_TMP",str(ROOT/"test-work")))
 SCRATCH.mkdir(parents=True,exist_ok=True)
@@ -33,6 +34,29 @@ def config(count=1,mode="none"):
 
 
 class RegionTests(unittest.TestCase):
+    def test_start_confirmation_binds_order_before_second_snapshot(self):
+        for count in (2,5):
+            c=config(count)
+            rects=selection(c)
+            names=capture_names(rects)
+            image=Image.new("RGB",(320,240),"white")
+            gui=Mock()
+            gui.target_metadata.return_value={"selection_bounds":[0,0,320,240]}
+            for changed in (False,True):
+                order=list(reversed(names)) if changed else names
+                returned={name:copy.deepcopy(rects[name]) for name in order+["NEXT","PROGRESS"]}
+                self.assertEqual(returned,rects)  # geometry equality cannot bind order
+                result={"action":"save","rects":returned,"point":c["next_point"],"paper":"A4",
+                        "orientation":"portrait","navigation":"none"}
+                with self.subTest(count=count,reordered=changed),patch.object(wizard.tk,"Tk",return_value=Mock()),patch.object(wizard,"fresh_image",return_value=image) as fresh,patch.object(wizard,"RectanglePicker",return_value=Mock(show=Mock(return_value=result))):
+                    if changed:
+                        with self.assertRaises(CalibrationError) as error:wizard.confirm_capture(gui,c)
+                        self.assertEqual(error.exception.code,"INVALID_RECTANGLE")
+                        self.assertEqual(fresh.call_count,1)
+                    else:
+                        self.assertIs(wizard.confirm_capture(gui,c),image)
+                        self.assertEqual(fresh.call_count,2)
+
     def test_one_two_twelve_regions_capture_pdf_order(self):
         for count in (1,2,12):
             c=config(count)

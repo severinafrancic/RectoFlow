@@ -6,8 +6,10 @@ This tracked note does not self-issue independent or owner acceptance.
 
 Builder checks for the one-to-many implementation:
 
-- 86 focused/regression tests passed: 70 legacy/calibration tests plus 16 new
+- 87 focused/regression tests passed: 70 legacy/calibration tests plus 17 new
   one-to-many/browser/export tests.
+- Final start confirmation binds both rectangle geometry and capture order.
+  Reordering that preview requires saving a new calibration before acquisition.
 - Native hidden Tk test with synthetic pixels passed dynamic add/delete/reorder,
   selector consistency, one-region acceptance and paper-stable final reopening.
 - Portable Windows x64 EXE built with included Python/Tcl/UIA/Pillow/ReportLab;

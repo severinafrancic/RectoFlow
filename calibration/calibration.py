@@ -212,7 +212,8 @@ def confirm_capture(gui,cfg):
                                cfg.get("paper_format","Original"),cfg.get("paper_orientation","portrait"),final=True,save_label="Aufnahme starten",navigation_mode=navigation(cfg)).show()
         if result["action"]!="save":
             raise CalibrationError("CALIBRATION_CANCELLED","Capture nicht gestartet; --calibrate fuer Aenderungen.")
-        if result["rects"]!=rects or result["point"]!=cfg["next_point"] or result["paper"]!=cfg.get("paper_format","Original") or result["orientation"]!=cfg.get("paper_orientation","portrait") or result.get("navigation",navigation(cfg))!=navigation(cfg):
+        # Dict equality alone ignores insertion order, which is the PDF order.
+        if capture_names(result["rects"])!=capture_names(rects) or result["rects"]!=rects or result["point"]!=cfg["next_point"] or result["paper"]!=cfg.get("paper_format","Original") or result["orientation"]!=cfg.get("paper_orientation","portrait") or result.get("navigation",navigation(cfg))!=navigation(cfg):
             raise CalibrationError("INVALID_RECTANGLE","Auswahl wurde geaendert. Mit --calibrate speichern, danach Aufnahme neu starten.")
         current=fresh_image(gui,park=True)
         assert_same_selection(image,current,rects)

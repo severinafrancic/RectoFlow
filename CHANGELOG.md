@@ -1,5 +1,9 @@
 # Changelog
 
+The initial prerelease includes the independent-review fix that binds capture
+order in the final start confirmation, with regression coverage for reordered
+two-region and many-region selections.
+
 ## 0.1.0 — initial prerelease
 
 - One, two or many ordered screenshot regions; add/delete/reorder controls.

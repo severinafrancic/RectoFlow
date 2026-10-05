@@ -12,6 +12,9 @@ capture a single view. At the end, choose the PDF paper size and orientation.
 [Deutsche Anleitung](README.de.md) · [User guide](docs/USER_GUIDE.md) ·
 [Browser compatibility](docs/COMPATIBILITY.md) · [MIT license](LICENSE)
 
+The capture adapter uses native Windows screenshots; see the
+[FireShot integration assessment](docs/FIRESHOT.md).
+
 ## Windows download
 
 Get the portable Windows x64 ZIP from [Releases](https://github.com/severinafrancic/RectoFlow/releases).
