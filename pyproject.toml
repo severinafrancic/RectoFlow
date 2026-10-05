@@ -1,0 +1,21 @@
+[project]
+name = "rectoflow"
+version = "0.1.0"
+description = "Ordered browser screen regions to PDF, with local calibration and final paper choice"
+requires-python = ">=3.11"
+license = "MIT"
+readme = "README.md"
+authors = [{name = "RectoFlow contributors"}]
+dependencies = ["Pillow>=10,<13", "reportlab>=4,<5", "uiautomation>=2.0.20,<3; sys_platform == 'win32'"]
+classifiers = ["Development Status :: 3 - Alpha", "Operating System :: Microsoft :: Windows", "Programming Language :: Python :: 3", "Topic :: Multimedia :: Graphics :: Capture :: Screen Capture"]
+
+[project.urls]
+Repository = "https://github.com/severinafrancic/RectoFlow"
+Issues = "https://github.com/severinafrancic/RectoFlow/issues"
+
+[tool.setuptools]
+py-modules = ["rectoflow", "edge_capture"]
+packages = ["calibration"]
+
+[tool.setuptools.package-data]
+calibration = ["*.js"]

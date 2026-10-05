@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="RectoFlow logo">
+<rect width="128" height="128" rx="26" fill="#17243c"/>
+<rect x="20" y="25" width="44" height="60" rx="5" fill="none" stroke="#65b8ff" stroke-width="6"/>
+<rect x="49" y="43" width="44" height="60" rx="5" fill="#17243c" stroke="#c79dff" stroke-width="6"/>
+<path d="M79 25h25v23m0-23L82 47" fill="none" stroke="#75e0c5" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
