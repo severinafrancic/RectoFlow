@@ -179,6 +179,46 @@ class CalibrationV02Tests(unittest.TestCase):
 class ProfileTests(unittest.TestCase):
     def cfg(self):return json.loads((ROOT/"config.json").read_bytes())
 
+    def test_malformed_template_headers_are_isolated_without_large_decode(self):
+        from io import BytesIO
+        import struct,zlib,warnings
+        from calibration.profiles import decode_template
+        data=BytesIO();Image.new("RGB",(80,60),"green").save(data,format="PNG");valid=data.getvalue()
+        def header(width,height):
+            raw=bytearray(valid);raw[16:24]=struct.pack(">II",width,height)
+            raw[29:33]=struct.pack(">I",zlib.crc32(raw[12:29])&0xffffffff)
+            return bytes(raw)
+        malformed=[header(50000,50000),header(10000,10000),header(81,60),valid[:33],b"not an image"]
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td,warnings.catch_warnings(record=True):
+            store=ProfileStore(td);healthy=store.create("Healthy",self.cfg())
+            cfg=self.cfg();cfg["button_mode"]="template"
+            for raw in malformed:
+                identifier=store.create("Bad template",cfg,{"enabled":valid,"disabled":valid})
+                (store.path(identifier)/"button_enabled.png").write_bytes(raw)
+                with self.assertRaises(ValueError):decode_template(raw,(80,60))
+                gui=core.WindowsGUI.__new__(core.WindowsGUI);gui.cfg=cfg
+                gui.template_bytes={"button_enabled.png":raw,"button_disabled.png":valid}
+                with self.assertRaises(ValueError):gui.prepare_button()
+            rows=store.enumerate()
+            self.assertEqual(len(rows),1+len(malformed))
+            self.assertEqual([row["uuid"] for row in rows if row["ready"]],[healthy])
+            for row in rows:
+                if not row["ready"]:self.assertIn("Vorlage",row["reason"])
+            meta=store.path(healthy)/"profile.json";contents=json.loads(meta.read_bytes());contents["schema"]=True
+            meta.write_text(json.dumps(contents));self.assertFalse(any(row["ready"] for row in store.enumerate()))
+
+    def test_template_dimension_validation_precedes_pixel_load(self):
+        from io import BytesIO
+        from calibration.profiles import decode_template
+        data=BytesIO();Image.new("RGB",(81,60),"green").save(data,format="PNG")
+        with patch("PIL.PngImagePlugin.PngImageFile.load") as load:
+            with self.assertRaises(ValueError):decode_template(data.getvalue(),(80,60))
+            load.assert_not_called()
+        with patch("PIL.Image.open",side_effect=RuntimeError("image provider failed")):
+            with self.assertRaises(ValueError):decode_template(data.getvalue(),(80,60))
+        with patch("PIL.Image.open",side_effect=MemoryError):
+            with self.assertRaises(MemoryError):decode_template(data.getvalue(),(80,60))
+
     def test_malformed_profile_isolation_for_json_roots_and_large_numbers(self):
         with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
             store=ProfileStore(td);healthy=store.create("Healthy",self.cfg())

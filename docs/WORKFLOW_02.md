@@ -70,6 +70,9 @@ number serialization; zero/infinite MediaBoxes cannot produce COMPLETE results.
 JSON numeric validation rejects values outside finite runtime representation
 without escaping per-profile isolation. Metadata and config roots must be objects;
 one malformed profile cannot prevent discovery of valid siblings.
+Template decoding is shared by profile validation, recording and runtime. It
+rejects unexpected dimensions before loading pixels, preserves Pillow image-bomb
+limits and turns malformed image data into per-profile validation errors.
 
 Analysis v1: corresponding regions, RGB 64×64 LANCZOS, mean absolute channel
 difference; similarity = 1 − difference/255, view mean across every region,
