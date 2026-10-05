@@ -14,18 +14,75 @@ ROOT=Path(__file__).resolve().parents[1]
 SCRATCH=ROOT/".build-tests-v02"
 SCRATCH.mkdir(exist_ok=True)
 sys.path.insert(0,str(ROOT))
-from calibration.storage import exclusive, LockBusy
+from calibration.storage import exclusive, LockBusy,lock_identity,config_lock,config_exclusive
 from calibration.config_io import atomic_update, backups, restore
 from calibration.geometry import CalibrationError
 from calibration.screenshot_picker import RectanglePicker
 from calibration.dom_picker import DOMSession
 from calibration.profiles import ProfileStore
 from calibration.geometry import align_rect
+from calibration.exports import (create_plan,execute_plan,source_snapshot,view_images,
+    analyze_view,region_statistics,running_state,digest)
+from PIL import Image
+from pypdf import PdfReader
 from test_calibration import payload
 import edge_capture as core
 
 
 class CalibrationV02Tests(unittest.TestCase):
+    def test_frozen_cli_failure_never_opens_modal_dialog(self):
+        import rectoflow
+        with patch.object(sys,"argv",["RectoFlow.exe","--rebuild","interrupted"]),patch.object(sys,"frozen",True,create=True),patch.object(rectoflow,"main",side_effect=ValueError("RUNNING")),patch.object(rectoflow.messagebox,"showerror") as dialog:
+            self.assertEqual(rectoflow.entrypoint(),2)
+            dialog.assert_not_called()
+
+    def test_junction_alias_resolves_to_same_config_lock(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            folder=Path(td);target=folder/"target";target.mkdir();config=target/"Config.json";config.write_text("{}")
+            junction=folder/"junction"
+            made=subprocess.run(["cmd.exe","/c","mklink","/J",str(junction),str(target)],capture_output=True,text=True)
+            self.assertEqual(made.returncode,0,made.stderr)
+            try:
+                self.assertEqual(lock_identity(config),lock_identity(junction/"Config.json"))
+                self.assertEqual(config_lock(config),config_lock(junction/"Config.json"))
+            finally:junction.rmdir()  # removes this owned junction, never its target contents
+
+    def test_native_file_lock_identity_case_dot_and_hardlink_aliases(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            folder=Path(td);path=folder/"Config.json";path.write_text("{}")
+            sub=folder/"sub";sub.mkdir()
+            alias=folder/"alias.json";os.link(path,alias)
+            variants=[path,Path(str(path).swapcase()),sub/".."/"Config.json",alias]
+            self.assertEqual(len({lock_identity(p) for p in variants}),1)
+            self.assertEqual(config_lock(path),config_lock(sub/".."/"Config.json"))
+            with config_exclusive(path):
+                script="from calibration.storage import config_exclusive;import sys\nwith config_exclusive(sys.argv[1]): print('UNEXPECTED')"
+                child=subprocess.run([sys.executable,"-c",script,str(alias)],cwd=ROOT,capture_output=True,text=True,timeout=10)
+                self.assertNotEqual(child.returncode,0)
+            missing=folder/"new.json"
+            self.assertEqual(lock_identity(missing),lock_identity(sub/".."/"new.json"))
+
+    def test_unpublished_backup_is_not_enumerated_on_failed_write(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            path=Path(td)/"config.json";original=b'{"old":true}';path.write_bytes(original)
+            real_replace=os.replace
+            def deny_backup(source,destination):
+                if ".backup." in str(destination):
+                    self.assertEqual(backups(path),[])
+                    self.assertEqual(Path(source).read_bytes(),original)
+                    raise OSError("backup publication failed")
+                return real_replace(source,destination)
+            with patch("calibration.config_io.os.replace",side_effect=deny_backup),self.assertRaises(CalibrationError):
+                atomic_update(path,{"new":True},digest(original),lambda c:None)
+            self.assertEqual(path.read_bytes(),original);self.assertEqual(backups(path),[])
+
+    def test_console_accepts_unicode_browser_titles_on_cp1252(self):
+        from io import BytesIO,TextIOWrapper
+        data=BytesIO();stream=TextIOWrapper(data,encoding="cp1252")
+        with patch.object(sys,"stdout",stream):
+            core.configure_console();print("Browser\u200bTitle");stream.flush()
+        self.assertIn(b"\\u200b",data.getvalue())
+
     def test_activation_checks_environment_before_focus_and_focus_after(self):
         g=core.WindowsGUI.__new__(core.WindowsGUI);g.hwnd=11;g.bound_identity=[1,2]
         g.user=Mock();g.user.IsWindow.return_value=True;g.process_identity=lambda:[1,2]
@@ -103,6 +160,31 @@ class CalibrationV02Tests(unittest.TestCase):
 class ProfileTests(unittest.TestCase):
     def cfg(self):return json.loads((ROOT/"config.json").read_bytes())
 
+    def test_template_recording_is_locked_atomic_and_rejects_stale_config(self):
+        from io import BytesIO
+        from calibration.config_io import record_template
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            store=ProfileStore(td);identifier=store.create("Book",self.cfg())
+            path=store.path(identifier)/"config.json"
+            cfg=self.cfg();cfg["button_mode"]="template"
+            atomic_update(path,cfg,digest(path.read_bytes()),lambda c:None)
+            snap=store.snapshot(identifier,include_templates=False)
+            image=BytesIO();Image.new("RGB",tuple(cfg["button_rect"][2:]),"green").save(image,format="PNG")
+            raw=image.getvalue()
+            with self.assertRaises(FileNotFoundError):store.snapshot(identifier)
+            with self.assertRaises(CalibrationError):record_template(path,"enabled",raw,"stale")
+            self.assertFalse((path.parent/"button_enabled.png").exists())
+            script="from calibration.config_io import record_template;import sys\nrecord_template(sys.argv[1],'enabled',bytes.fromhex(sys.argv[2]),sys.argv[3])"
+            with store.transaction([identifier]):
+                child=subprocess.run([sys.executable,"-c",script,str(path),raw.hex(),digest(snap["config_bytes"])],cwd=ROOT,capture_output=True,text=True,timeout=10)
+                self.assertNotEqual(child.returncode,0)
+                self.assertFalse((path.parent/"button_enabled.png").exists())
+            saved=record_template(path,"enabled",raw,digest(snap["config_bytes"]))
+            self.assertEqual(saved.read_bytes(),raw)
+            with self.assertRaises(ValueError):record_template(path,"enabled",raw,digest(snap["config_bytes"]))
+            record_template(path,"disabled",raw,digest(snap["config_bytes"]))
+            self.assertEqual(store.snapshot(identifier)["templates"]["enabled"],raw)
+
     def test_indexless_enumeration_duplicate_rename_and_output_root(self):
         with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
             store=ProfileStore(td);identifier=store.create("Book",self.cfg())
@@ -128,6 +210,9 @@ class ProfileTests(unittest.TestCase):
             self.assertEqual(snap["templates"],templates)
             self.assertEqual(store.snapshot(copyid)["templates"],templates)
             self.assertEqual(snap["profile"]["template_sha256"]["enabled"],hashlib.sha256(templates["enabled"]).hexdigest())
+            gui=core.WindowsGUI.__new__(core.WindowsGUI);gui.cfg=cfg;gui.config_dir=store.path(identifier)
+            gui.template_bytes={"button_"+key+".png":data for key,data in snap["templates"].items()}
+            gui.prepare_button();self.assertEqual(gui.enabled.getpixel((0,0)),(0,128,0))
 
     def test_source_import_is_byte_preserving(self):
         with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
@@ -151,6 +236,130 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(align_rect(old,ref,"size",bounds),[100,50,40,70])
         with self.assertRaises(CalibrationError):align_rect(old,[280,20,40,70],"right",bounds)
         self.assertEqual(old,[100,50,30,60])
+
+
+class ExportTests(unittest.TestCase):
+    def fixture(self,folder,status="COMPLETE"):
+        cfg=json.loads((ROOT/"config.json").read_bytes())
+        cfg.update(regions=[[10,20,40,50],[70,20,45,30]],navigation_mode="none",paper_format="A4")
+        pairs=[]
+        for index,color in enumerate(("red","blue","green"),1):
+            pairs.append(core.save_pair(folder,index,Image.new("RGB",(150,100),color),cfg))
+        m={"schema":3,"version":"0.2.0","status":status,"finished":"2026-10-05T00:00:00+00:00","config":cfg,"pairs":pairs,"profile":None}
+        core.write_json(folder/"manifest.json",m)
+        return m
+
+    def test_export_order_dimensions_provenance_and_immutable_originals(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            folder=Path(td);m=self.fixture(folder);before=(folder/"manifest.json").read_bytes()
+            plan=create_plan(folder,[3,1],{"paper_format":"A5","paper_orientation":"landscape"})
+            planbytes=plan.read_bytes();output=execute_plan(folder,plan)
+            result=json.loads((output.parent/"result.json").read_bytes())
+            self.assertEqual(result["status"],"COMPLETE");self.assertEqual(result["source_manifest_sha256"],digest(before))
+            self.assertEqual(result["export_plan_sha256"],digest(planbytes));self.assertEqual(result["pdf_sha256"],digest(output.read_bytes()))
+            pdf=PdfReader(output);self.assertEqual(len(pdf.pages),4)
+            self.assertAlmostEqual(float(pdf.pages[0].mediabox.width)*25.4/72,210,places=3)
+            self.assertEqual(pdf.pages[0].images[0].image.convert("RGB").getpixel((0,0)),(0,128,0))
+            self.assertEqual(pdf.pages[2].images[0].image.convert("RGB").getpixel((0,0)),(255,0,0))
+            self.assertEqual((folder/"manifest.json").read_bytes(),before)
+            for pair in m["pairs"]:
+                for entry in pair["images"]:self.assertEqual(core.sha256(folder/entry["file"]),entry["sha256"])
+
+    def test_duplicate_empty_and_unknown_indices_are_rejected(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            folder=Path(td);self.fixture(folder)
+            for indices in ([1,1],[],[4],[True]):
+                with self.subTest(indices=indices),self.assertRaises(ValueError):create_plan(folder,indices)
+
+    def test_schema3_public_legacy_api_cannot_bypass_plan(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            folder=Path(td);m=self.fixture(folder)
+            with self.assertRaises(ValueError):core.build_pdf(folder,m,folder/"bypass.pdf")
+            self.assertFalse((folder/"bypass.pdf").exists())
+
+    def test_running_is_never_exported_or_modified(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            folder=Path(td);self.fixture(folder,"RUNNING");before=(folder/"manifest.json").read_bytes()
+            self.assertIn("INTERRUPTED",running_state(folder))
+            with exclusive(folder/".writer.lock"):
+                self.assertIn("aktiv",running_state(folder))
+            with self.assertRaises(ValueError):create_plan(folder)
+            with patch.object(sys,"argv",["edge_capture.py","--rebuild",str(folder)]),self.assertRaises(ValueError):core.main()
+            self.assertEqual((folder/"manifest.json").read_bytes(),before)
+
+    def test_decode_uses_verified_bytes_after_path_replacement(self):
+        from io import BytesIO
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            folder=Path(td);m=self.fixture(folder);path=folder/m["pairs"][0]["images"][0]["file"]
+            original_open=Image.open;changed=False
+            def decode(source,*args,**kwargs):
+                nonlocal changed
+                self.assertIsInstance(source,BytesIO)
+                if not changed:
+                    changed=True;Image.new("RGB",(40,50),"black").save(path)
+                return original_open(source,*args,**kwargs)
+            with patch("calibration.exports.Image.open",side_effect=decode):images=view_images(folder,m,1)
+            self.assertEqual(images[0].getpixel((0,0)),(255,0,0))
+
+    def test_invalid_dimensions_after_decoding_block_export(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            folder=Path(td);m=self.fixture(folder)
+            entry=m["pairs"][0]["images"][0];path=folder/entry["file"]
+            Image.new("RGB",(5,5),"red").save(path);entry["sha256"]=core.sha256(path)
+            core.write_json(folder/"manifest.json",m)
+            plan=create_plan(folder,[1])
+            with self.assertRaises(ValueError):execute_plan(folder,plan)
+            self.assertEqual(json.loads((plan.parent/"result.json").read_bytes())["status"],"FAILED")
+
+    def test_invalid_excluded_view_does_not_block_valid_export(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            folder=Path(td);m=self.fixture(folder);(folder/m["pairs"][1]["images"][0]["file"]).write_bytes(b"broken")
+            output=execute_plan(folder,create_plan(folder,[1,3]));self.assertEqual(len(PdfReader(output).pages),4)
+
+    def test_plan_changed_during_render_fails_without_mutating_manifest(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            folder=Path(td);self.fixture(folder);before=(folder/"manifest.json").read_bytes();plan=create_plan(folder)
+            renderer=core._render_pdf
+            def change(*args,**kwargs):
+                result=renderer(*args,**kwargs);plan.write_bytes(plan.read_bytes()+b" ");return result
+            with patch.object(core,"_render_pdf",side_effect=change),self.assertRaises(ValueError):execute_plan(folder,plan)
+            self.assertEqual(json.loads((plan.parent/"result.json").read_bytes())["status"],"FAILED")
+            self.assertEqual((folder/"manifest.json").read_bytes(),before)
+
+    def test_persisted_plan_bytes_determine_order_and_result_hash(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            folder=Path(td);self.fixture(folder);plan=create_plan(folder,[1])
+            stored=json.loads(plan.read_bytes());stored["selected_view_indices"]=[2]
+            plan.write_bytes(json.dumps(stored,separators=(",",":")).encode())
+            actual=plan.read_bytes();output=execute_plan(folder,plan)
+            self.assertEqual(json.loads((output.parent/"result.json").read_bytes())["export_plan_sha256"],digest(actual))
+            self.assertEqual(PdfReader(output).pages[0].images[0].image.convert("RGB").getpixel((0,0)),(0,0,255))
+
+    def test_rebuild_schema3_with_and_without_plan_has_provenance(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            folder=Path(td);self.fixture(folder)
+            with patch.object(sys,"argv",["edge_capture.py","--rebuild",str(folder),"--paper","A5"]):self.assertEqual(core.main(),0)
+            first=next((folder/"exports").glob("*/result.json"));self.assertEqual(json.loads(first.read_bytes())["status"],"COMPLETE")
+            plan=create_plan(folder,[2])
+            with patch.object(sys,"argv",["edge_capture.py","--rebuild",str(folder),"--export-plan",str(plan)]):self.assertEqual(core.main(),0)
+            with patch.object(sys,"argv",["edge_capture.py","--rebuild",str(folder),"--export-plan",str(plan),"--paper","A4"]),self.assertRaises(SystemExit):core.main()
+
+    def test_similarity_and_contrast_are_deterministic(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            folder=Path(td);m=self.fixture(folder)
+            for index in (1,2):
+                m["pairs"][index-1]=core.save_pair(folder,index,Image.new("RGB",(150,100),"white"),m["config"])
+            analysis=analyze_view(folder,m,2);self.assertEqual(analysis["similarity"],1)
+            self.assertEqual(analysis["low_contrast_stddev"],[0,0]);self.assertEqual(len(analysis["warnings"]),3)
+            a=Image.new("RGB",(64,64),(100,100,100));a.paste((104,104,104),(32,0,64,64))
+            self.assertAlmostEqual(region_statistics(a)[1],2,places=8)
+
+    def test_export_cancel_records_separate_result_and_preserves_capture(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            folder=Path(td);self.fixture(folder);before=(folder/"manifest.json").read_bytes();plan=create_plan(folder)
+            with patch.object(core,"_render_pdf",side_effect=KeyboardInterrupt),self.assertRaises(KeyboardInterrupt):execute_plan(folder,plan)
+            self.assertEqual(json.loads((plan.parent/"result.json").read_bytes())["status"],"CANCELLED")
+            self.assertEqual((folder/"manifest.json").read_bytes(),before)
 
 
 if __name__=="__main__":unittest.main()

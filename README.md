@@ -20,18 +20,18 @@ The capture adapter uses native Windows screenshots; see the
 Get the portable Windows x64 ZIP from [Releases](https://github.com/severinafrancic/RectoFlow/releases).
 Extract the **whole ZIP** into a writable folder and open `RectoFlow.exe`.
 Keep `_internal` beside the executable. Python is included; a separate Python
-installation is unnecessary. This first release is a **prerelease**, unsigned.
+installation is unnecessary. Version 0.2 remains an unsigned **prerelease**.
 
 ## How it works
 
 1. Open your document in a supported browser on the primary monitor.
-2. Start RectoFlow and choose **Bereiche kalibrieren**. During the countdown,
-   bring the intended browser window to the foreground.
+2. Start RectoFlow, create/import a profile or choose a config, then select
+   **Bereiche kalibrieren** and explicitly choose the browser window.
 3. Choose one or more rectangles. Add, delete, move, resize and reorder them.
    The list order is the PDF order. Choose automatic Next, manual or single-view navigation.
 4. Review the fresh final preview and explicitly confirm the selection.
 5. Start capture separately. New calibrations require another current preview confirmation.
-6. At the end, select A4, A5, A3, A6, A2, A1, A0, Letter, Legal or original dimensions;
+6. Review saved views, exclude or reorder whole views, then select A4, A5, A3, A6, A2, A1, A0, Letter, Legal or original dimensions;
    portrait or landscape; one PDF page per region or all regions of each view side by side.
 
 Paper changes after capture preserve the original PNGs. Images are fitted
@@ -43,13 +43,15 @@ export keeps the captured data for later export.
 - One, two, three or as many independently selected regions as you need;
   there is no fixed limit on the number of rectangles. Add them with **+ Bereich**
   and choose their capture order.
-- Eight resize handles, paper-aspect fitting and an editable final control preview.
+- Eight resize handles and free geometry; optional confirmed aspect adjustment.
+- Reusable independent profiles, duplicate/alignment tools and retained config backups.
 - Automatic Next with fresh UIA state or explicitly calibrated image templates.
 - Manual navigation and single-view capture without a Next button.
-- Optional temporary local DOM proposals for the first two regions, Next and progress;
+- Experimental local bookmarklet/JSON-file DOM proposals for the first two regions, Next and progress;
   full manual screenshot selection for every region.
 - Physical screen pixels, selected-window binding and window/monitor/DPI checks.
-- PNG hashes, ordered manifests, stopped-run PDF recovery and export without browser navigation.
+- Frozen capture manifests, immutable PNGs, thumbnail review and reproducible similarity/contrast warnings.
+- Persisted ExportPlans and linked manifest/plan/PDF hashes for every new 0.2 export.
 - Friendly launcher plus a command line interface.
 
 ## Run from source
@@ -67,6 +69,7 @@ py -m venv .venv
 .\.venv\Scripts\python.exe rectoflow.py --preview
 .\.venv\Scripts\python.exe rectoflow.py --capture
 .\.venv\Scripts\python.exe rectoflow.py --rebuild "aufnahmen\run_..." --paper A5 --orientation landscape
+.\.venv\Scripts\python.exe rectoflow.py --rebuild "aufnahmen\run_..." --export-plan "aufnahmen\run_...\exports\...\export_plan.json"
 ```
 
 ## Compatibility and limits
@@ -82,6 +85,8 @@ manual capture have bounded view counts. ESC or the top-left screen corner
 stops acquisition. A long-lived loading screen or temporarily disabled button
 can resemble an end state: use a reliable progress indicator and known view count
 where available. This release does not claim universal page-load detection.
+An interrupted RUNNING manifest is never treated as complete or automatically
+finalized. Recovery/resume of that run is outside 0.2.
 
 ## Privacy
 

@@ -294,6 +294,7 @@ class CaptureTests(unittest.TestCase):
             folder = Path(tmp)
             cfg = config()
             cfg["output_dir"] = "runs"
+            cfg["confirm_pdf_export"] = False  # headless test; partial review is now also available
             config_path = folder / "config.json"
             config_path.write_text(json.dumps(cfg))
             gui = FakeGUI([(picture(), "enabled")])
@@ -306,7 +307,11 @@ class CaptureTests(unittest.TestCase):
             run = next((folder / "runs").iterdir())
             manifest = json.loads((run / "manifest.json").read_text())
             self.assertEqual(manifest["status"], "STOPPED")
-            self.assertEqual(len(PdfReader(run / "gesamt_TEILSTAND.pdf").pages), 2)
+            exported=next((run/"exports").glob("*/document.pdf"))
+            self.assertEqual(len(PdfReader(exported).pages), 2)
+            self.assertEqual(manifest["schema"],3)
+            self.assertNotIn("pdf",manifest)
+            self.assertEqual(json.loads((exported.parent/"result.json").read_bytes())["status"],"COMPLETE")
             self.assertFalse((run / "gesamt.pdf").exists())
             self.assertEqual(gui.clicks, 1)
 

@@ -25,7 +25,7 @@ def run(exe,*args):
 def main():
     scratch=ROOT/".build-release-smoke"
     scratch.mkdir(exist_ok=True)
-    archive=ROOT/"artifacts"/"RectoFlow-0.1.0-windows-x64.zip"
+    archive=ROOT/"artifacts"/f"RectoFlow-{core.VERSION}-windows-x64.zip"
     with tempfile.TemporaryDirectory(dir=scratch) as tmp:
         folder=Path(tmp)
         with zipfile.ZipFile(archive) as z:
@@ -37,7 +37,7 @@ def main():
         check=json.loads(run(exe,"--self-check"))
         assert check["frozen"] and check["architecture"]==64
         assert Path(check["config_root"])==exe.parent
-        assert run(exe,"--version").strip()=="RectoFlow 0.1.0"
+        assert run(exe,"--version").strip()==f"RectoFlow {core.VERSION}"
         assert "--rebuild" in run(exe,"--help")
         cfg=json.loads((ROOT/"config.json").read_text())
         cfg.update(regions=[[20,50,180,250],[240,50,200,210],[480,50,160,240]],navigation_mode="none",paper_format="A4")
@@ -64,6 +64,25 @@ def main():
         assert len(PdfReader(spread).pages)==1
         assert (captured/"manifest.json").read_bytes()==before
         for entry in record["images"]:assert core.sha256(captured/entry["file"])==entry["sha256"]
+        manifest.update(schema=3,version=core.VERSION,finished="2026-10-05T00:00:00+00:00",profile=None)
+        core.write_json(captured/"manifest.json",manifest)
+        before=(captured/"manifest.json").read_bytes()
+        frozen_pdf=Path(run(exe,"--rebuild",captured,"--paper","A5").strip().splitlines()[-1])
+        result=json.loads((frozen_pdf.parent/"result.json").read_bytes())
+        assert result["status"]=="COMPLETE" and result["pdf_sha256"]==core.sha256(frozen_pdf)
+        assert result["source_manifest_sha256"]==core.sha256(captured/"manifest.json")
+        assert result["export_plan_sha256"]==core.sha256(frozen_pdf.parent/"export_plan.json")
+        from calibration.exports import create_plan
+        plan=create_plan(captured,[1],{"paper_format":"A4","pdf_layout":"spread"})
+        planned_pdf=Path(run(exe,"--rebuild",captured,"--export-plan",plan).strip().splitlines()[-1])
+        assert len(PdfReader(planned_pdf).pages)==1
+        assert (captured/"manifest.json").read_bytes()==before
+        manifest["status"]="RUNNING";core.write_json(captured/"manifest.json",manifest)
+        interrupted_bytes=(captured/"manifest.json").read_bytes()
+        try:run(exe,"--rebuild",captured)
+        except subprocess.CalledProcessError:pass
+        else:raise AssertionError("RUNNING was exported")
+        assert (captured/"manifest.json").read_bytes()==interrupted_bytes
         print("FROZEN_SMOKE_PASS: relocated Windows x64 EXE; clean PATH; Tcl/UIA/Pillow/ReportLab imports; version/help; 3 ordered pixel-exact A5 landscape pages; A4 spread; unchanged PNGs/manifest.")
 
 

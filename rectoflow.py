@@ -125,6 +125,11 @@ def launcher():
         if not name:return 0
         from calibration.pdf_export import export_dialog
         path=Path(name)
+        from calibration.exports import running_state
+        state=running_state(path.parent)
+        if state not in ("COMPLETE","STOPPED","PDF_FAILED"):
+            messagebox.showwarning("Aufnahme nicht abgeschlossen",state+"\nOriginaldateien bleiben erhalten. Kein Resume in Version 0.2.")
+            return 2
         result=export_dialog(path.parent,json.loads(path.read_text(encoding="utf-8")),core.build_pdf)
         if result:
             messagebox.showinfo("PDF fertig",f"Gespeichert:\n{path.parent/result['file']}")
@@ -143,11 +148,16 @@ def main():
     return core.main()
 
 
-if __name__=="__main__":
+def entrypoint():
+    graphical = len(sys.argv)==1 or sys.argv[1:]==["--gui"]
     try:
-        raise SystemExit(main())
+        return main()
     except (Exception,KeyboardInterrupt) as error:
         print(f"STOPP: {type(error).__name__}: {error}",file=sys.stderr)
-        if getattr(sys,"frozen",False):
+        if graphical and getattr(sys,"frozen",False):
             messagebox.showerror("RectoFlow gestoppt",str(error))
-        raise SystemExit(2)
+        return 2
+
+
+if __name__=="__main__":
+    raise SystemExit(entrypoint())

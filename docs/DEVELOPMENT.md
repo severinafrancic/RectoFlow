@@ -29,10 +29,28 @@ RectoFlow.exe --version
 
 `calibration/regions.py` owns the ordered region/browser/navigation contracts.
 `geometry.py` keeps physical screen, CSS and scaled canvas spaces separate.
-`screenshot_picker.py` edits geometry and paper aspect; `config_io.py` atomically
+`screenshot_picker.py` edits free geometry with an optional explicit aspect action; `config_io.py` atomically
 preserves configuration. `edge_capture.py` binds the selected native window and
 owns stable/changed-state capture, manifests and PDF integrity. `pdf_export.py`
 uses only saved images for final paper choice. `rectoflow.py` is the launcher/CLI.
+
+`storage.py` provides native process locks; `profiles.py` owns indexless profile
+transactions/snapshots; `exports.py` owns schema-3 freeze validation, persisted
+plans, same-byte image verification/decoding, analysis and linked export results.
+Profile and export state are independent of capture data. See WORKFLOW_02.md.
+
+Native Edge fixture (own localhost page and isolated guest profile; changes focus,
+never adopts an owner browser or changes desktop DPI):
+
+```powershell
+python tests/edge_fixture_smoke.py
+python tests/edge_fixture_smoke.py --uia
+```
+
+The three substantive PRs target the integration branch. One full Fresh Breaker
+reviews the integrated SHA, then the final PR base/head/CI/conflicts are checked
+before owner acceptance. Material changes invalidate affected evidence; main
+merge and release hashes need separate post-merge verification.
 
 One capture record becomes visible in the manifest only after all region PNGs are
 written. Record ordering and names are deterministic. Failed navigation is never

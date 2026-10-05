@@ -51,14 +51,32 @@ present, overrides legacy fields. Atomic saves detect prior-byte conflicts;
 they do not provide a filesystem CAS guarantee against a noncooperating writer
 after the final digest check.
 
-New one-to-many manifests use schema 2 and keep the historical `pairs` array name
-for the ordered per-view records. Each record may now contain any positive
-number of images. Filenames are `000001_region_001.png`, then region 002, and so
-on. Legacy schema-1 records retain `left` / `right` filenames. PDF recovery checks
-exact expected names, order, image hashes and dimensions; arbitrary manifest paths
-are rejected. Capture coordinates do not change during final PDF export.
+New 0.2 manifests use schema 3 and retain the historical `pairs` array name for
+ordered views. Schema 1/2 remain legacy-readable. Filenames depend on the original
+config representation: ordered `regions` use `000001_region_001.png` onward;
+legacy configs retain left/right names. Arbitrary image paths are rejected.
 
-`COMPLETE` describes successful acquisition. If final PDF export is cancelled,
-`pdf_export_status` is `DEFERRED`; saved PNGs and manifest remain. `STOPPED` keeps
-the complete records before failure and may generate a `gesamt_TEILSTAND.pdf`.
-Rebuild/export never resumes browser navigation.
+Config saves serialize RectoFlow processes through native locks. All verified
+`config.backup.<UTC>.<id>.json` files are retained. Restore creates a backup of the
+current config before restoring exact selected bytes. Managed profile locks live
+in `data/.locks/`, independent of profile folders. Direct configs use adjacent locks.
+
+Capture ends with `COMPLETE` or `STOPPED` and `finished`, atomically persisted.
+Those manifest bytes and original PNGs are frozen before review. No new PDF fields
+are appended. `profile` is null for direct configs or contains UUID/config/template
+hashes from the actual isolated snapshot.
+
+Every schema-3 export uses `exports/<export-id>/export_plan.json`, `result.json`
+and `document.pdf`. Plan schema 1 binds the source-manifest hash, unique selected
+view indices and effective paper/orientation/layout/DPI. Persisted plan bytes are
+hashed and parsed once. Each image is read once, hashed, decoded from those bytes,
+then dimension-checked and rendered. Result schema 1 binds plan/manifest hashes;
+COMPLETE includes the finished PDF hash. Export failure never changes capture status.
+
+For schema 3, `--rebuild` without a plan persists an all-views plan before rendering.
+With `--export-plan`, that plan is authoritative and format overrides are rejected.
+Legacy rebuild may use its historical output names, preserving compatibility.
+
+RUNNING is never exported or silently finalized. The UI distinguishes active writer
+from interrupted/recovery-required or unknown activity. Fully recorded views remain
+on disk. There is no interrupted-run finalization or navigation resume in 0.2.

@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import uuid
 
-from .storage import exclusive, config_lock, atomic_json, atomic_bytes, config_transaction
+from .storage import exclusive, config_exclusive, atomic_json, atomic_bytes, config_transaction
 from .regions import navigation
 
 TEMPLATES={"enabled":"button_enabled.png","disabled":"button_disabled.png"}
@@ -51,12 +51,12 @@ class ProfileStore:
             for identifier in sorted(set(identifiers)):
                 stack.enter_context(exclusive(self.locks/("profile-"+profile_id(identifier)+".lock")))
             for identifier in sorted(set(identifiers)):
-                stack.enter_context(exclusive(config_lock(self.path(identifier)/"config.json")))
+                stack.enter_context(config_exclusive(self.path(identifier)/"config.json"))
             return stack
         except BaseException:
             stack.close();raise
 
-    def _snapshot(self,identifier):
+    def _snapshot(self,identifier,include_templates=True):
         path=self.path(identifier)
         if path.is_symlink() or getattr(path,"is_junction",lambda:False)():raise ValueError("Profilordner darf keine Umleitung sein.")
         meta=json.loads((path/"profile.json").read_bytes())
@@ -64,14 +64,14 @@ class ProfileStore:
             raise ValueError("Profilmetadaten ungueltig.")
         raw=(path/"config.json").read_bytes()
         cfg=json.loads(raw.decode("utf-8-sig"));validate_profile_config(cfg)
-        templates={key:(path/name).read_bytes() for key,name in TEMPLATES.items()} if cfg["button_mode"]=="template" and navigation(cfg)=="next_button" else {}
-        validate_templates(cfg,templates)
+        templates={key:(path/name).read_bytes() for key,name in TEMPLATES.items()} if include_templates and cfg["button_mode"]=="template" and navigation(cfg)=="next_button" else {}
+        if include_templates:validate_templates(cfg,templates)
         provenance={"uuid":identifier,"config_sha256":hashlib.sha256(raw).hexdigest(),"template_sha256":{key:hashlib.sha256(data).hexdigest() for key,data in templates.items()}}
         return {"metadata":meta,"config":cfg,"config_bytes":raw,"templates":templates,"profile":provenance,
                 "output_root":self.data/"captures"/identifier,"config_path":path/"config.json"}
 
-    def snapshot(self,identifier):
-        with self.transaction([identifier]):return self._snapshot(identifier)
+    def snapshot(self,identifier,include_templates=True):
+        with self.transaction([identifier]):return self._snapshot(identifier,include_templates)
 
     def enumerate(self):
         self.folder.mkdir(parents=True,exist_ok=True)
@@ -81,7 +81,7 @@ class ProfileStore:
                 if not path.is_dir() or path.name.startswith("."):continue
                 try:
                     identifier=profile_id(path.name)
-                    with exclusive(self.locks/("profile-"+identifier+".lock")),exclusive(config_lock(path/"config.json")):
+                    with exclusive(self.locks/("profile-"+identifier+".lock")),config_exclusive(path/"config.json"):
                         snap=self._snapshot(identifier)
                     result.append({"uuid":identifier,"name":snap["metadata"]["name"],"ready":True,"reason":""})
                 except (ValueError,OSError,RuntimeError,KeyError,TypeError) as error:

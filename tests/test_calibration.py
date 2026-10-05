@@ -431,7 +431,7 @@ class WizardTests(unittest.TestCase):
         gui.user.IsWindow.return_value=True
         gui.user.GetForegroundWindow.return_value=123
         gui.user.GetSystemMetrics.side_effect=lambda i:gui.size[i]
-        with patch("PIL.ImageGrab.grab",return_value=Image.new("RGB",(320,240),"white")),patch.object(edge.time,"sleep"):
+        with patch("PIL.ImageGrab.grab",return_value=Image.new("RGB",(320,240),"white")),patch.object(edge.time,"sleep"),patch.object(wizard,"marker_bounds",side_effect=[(1,1,17,17),None]):
             wizard.clean_dom(gui)
         gui.abort_check.assert_not_called()
         self.assertEqual(gui.user.keybd_event.call_count,2)

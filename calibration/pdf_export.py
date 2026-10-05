@@ -12,20 +12,8 @@ from .regions import image_names
 
 
 def preview_images(folder,manifest):
-    pair=manifest["pairs"][0]
-    names=image_names(manifest["config"],1)
-    if pair["index"]!=1 or len(pair["images"])!=len(names):
-        raise ValueError("Ungueltiger erster Aufnahme-Datensatz.")
-    result=[]
-    for expected,entry in zip(names,pair["images"]):
-        if entry["file"]!=expected:
-            raise ValueError("Ungueltige Bildnamen/Reihenfolge.")
-        path=Path(folder)/expected
-        if hashlib.sha256(path.read_bytes()).hexdigest()!=entry["sha256"]:
-            raise ValueError("Zwischenbild wurde veraendert.")
-        with Image.open(path) as im:
-            result.append(im.convert("RGB"))
-    return result
+    from .exports import view_images
+    return view_images(folder,manifest,1)
 
 
 def paper_preview(images,paper,orientation,layout):
@@ -46,12 +34,13 @@ def paper_preview(images,paper,orientation,layout):
 
 
 def export_dialog(folder,manifest,builder):
+    from .exports import source_snapshot,view_images,analyze_view,create_plan,execute_plan
+    manifest,source_hash=source_snapshot(folder)
     if not manifest["pairs"]:
         raise ValueError("Keine gespeicherten Aufnahmen vorhanden.")
-    images=preview_images(folder,manifest)
     root=tk.Tk()
-    root.title("RectoFlow: PDF-Format am Ende")
-    root.geometry("760x680")
+    root.title("RectoFlow: Aufnahmen pruefen und PDF erstellen")
+    root.geometry("1000x780")
     cfg=manifest["config"]
     paper=tk.StringVar(value=cfg.get("paper_format","A4"))
     direction=tk.StringVar(value="Querformat" if cfg.get("paper_orientation")=="landscape" else "Hochformat")
@@ -66,31 +55,74 @@ def export_dialog(folder,manifest,builder):
         box=ttk.Combobox(row,textvariable=variable,values=values,state="readonly",width=width)
         box.pack(side="left",padx=5)
         box.bind("<<ComboboxSelected>>",lambda e:render())
-    canvas=ttk.Label(root,anchor="center")
-    canvas.pack(fill="both",expand=True,pady=10)
-    info=ttk.Label(root,text="Vorschau: erste Ansicht / erste PDF-Seite. Alle Ansichten werden in Reihenfolge exportiert.",wraplength=720)
+    content=ttk.Frame(root);content.pack(fill="both",expand=True)
+    listing=ttk.Treeview(content,columns=("include","view","warnings"),show="headings",selectmode="browse",height=14)
+    for name,label,width in (("include","Export",55),("view","Ansicht",70),("warnings","Kontrolle",225)):
+        listing.heading(name,text=label);listing.column(name,width=width)
+    listing.pack(side="left",fill="y",padx=10)
+    scrollbar=ttk.Scrollbar(content,orient="vertical",command=listing.yview);scrollbar.pack(side="left",fill="y")
+    listing.configure(yscrollcommand=scrollbar.set)
+    ordered=list(range(1,len(manifest["pairs"])+1));included=set(ordered);warnings={}
+    images=[]
+    def refresh():
+        selected=listing.selection()
+        listing.delete(*listing.get_children())
+        for index in ordered:listing.insert("","end",iid=str(index),values=("Ja" if index in included else "Nein",index,warnings.get(index,"Noch nicht geprueft")))
+        if selected and listing.exists(selected[0]):listing.selection_set(selected[0])
+    canvas=ttk.Label(content,anchor="center");canvas.pack(side="left",fill="both",expand=True,pady=10)
+    info=ttk.Label(root,text="Ansichten auswaehlen, ausschliessen und umordnen. Warnungen entfernen nichts automatisch.",wraplength=920)
     info.pack(pady=5)
     result=None
     def options():
         return {"paper_format":paper.get(),"paper_orientation":"landscape" if direction.get()=="Querformat" else "portrait",
                 "pdf_layout":"spread" if layout.get()=="Nebeneinander" else "separate"}
     def render():
+        if not images:
+            canvas.configure(image="");return
         values=options()
         canvas.photo=ImageTk.PhotoImage(paper_preview(images,values["paper_format"],values["paper_orientation"],values["pdf_layout"]),master=root)
         canvas.configure(image=canvas.photo)
+    def selected_index():
+        return int(listing.selection()[0]) if listing.selection() else None
+    def select(event=None):
+        nonlocal images
+        index=selected_index()
+        if index is None:return
+        try:
+            images=view_images(folder,manifest,index)
+            analysis=analyze_view(folder,manifest,index)
+            warnings[index]="; ".join(analysis["warnings"]) or "Geprueft"
+            info.configure(text=f"Vorschau Ansicht {index}, erste PDF-Seite. "+warnings[index])
+        except Exception as error:
+            images=[];warnings[index]="FEHLER: "+str(error)
+            info.configure(text=f"Ansicht {index} ungueltig. Fuer Export ausdruecklich ausschliessen.")
+        listing.item(str(index),values=("Ja" if index in included else "Nein",index,warnings[index]))
+        render()
+    def toggle():
+        index=selected_index()
+        if index is None:return
+        if index in included:included.remove(index)
+        else:included.add(index)
+        refresh()
+    def reorder(delta):
+        index=selected_index()
+        if index is None:return
+        position=ordered.index(index);dest=position+delta
+        if 0<=dest<len(ordered):ordered[position],ordered[dest]=ordered[dest],ordered[position];refresh()
+    listing.bind("<<TreeviewSelect>>",select)
+    controls=ttk.Frame(root,padding=8);controls.pack(fill="x")
+    for label,command in (("Ein-/Ausschliessen",toggle),("Frueher",lambda:reorder(-1)),("Spaeter",lambda:reorder(1))):
+        ttk.Button(controls,text=label,command=command).pack(side="left",padx=4)
     def save():
         nonlocal result
         values=options()
         if not messagebox.askyesno("PDF bestaetigen",f"{paper.get()}, {direction.get()}, {layout.get()}: PDF jetzt erstellen?",parent=root):
             return
         try:
-            candidate=copy.deepcopy(manifest)
-            candidate["config"].update(values)
-            prefix="gesamt" if manifest["status"]=="COMPLETE" else "gesamt_TEILSTAND"
-            path=Path(folder)/f"{prefix}_{uuid.uuid4().hex[:8]}.pdf"
-            if not builder(folder,candidate,path):
-                raise ValueError("Keine Aufnahmen fuer PDF vorhanden.")
-            result={"file":path.name,"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),"options":values}
+            selected=[index for index in ordered if index in included]
+            plan=create_plan(folder,selected,values,expected_manifest_hash=source_hash)
+            path=execute_plan(folder,plan)
+            result={"file":path.relative_to(folder).as_posix(),"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),"options":values}
             root.destroy()
         except Exception as error:
             messagebox.showerror("PDF-Export fehlgeschlagen",str(error),parent=root)
@@ -99,7 +131,7 @@ def export_dialog(folder,manifest,builder):
     ttk.Button(footer,text="PDF bestaetigen und erstellen",command=save).pack(side="right",padx=5)
     ttk.Button(footer,text="Spaeter / Abbrechen",command=root.destroy).pack(side="right",padx=5)
     root.bind("<Escape>",lambda e:root.destroy())
-    render()
+    refresh();listing.selection_set(str(ordered[0]));select()
     try:
         root.mainloop()
     finally:

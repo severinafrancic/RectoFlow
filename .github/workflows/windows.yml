@@ -23,6 +23,10 @@ jobs:
         run: |
           $env:EDGE_CAPTURE_TEST_TMP = Join-Path $env:RUNNER_TEMP 'rectoflow-tests'
           python -B -m unittest discover -s tests -p 'test_*.py' -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/native_ui_smoke.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/native_review_smoke.py
       - name: Build and check portable Windows executable
         run: python scripts/build_windows.py
       - name: Relocated executable and PDF integrity smoke test
