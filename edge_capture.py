@@ -680,7 +680,7 @@ def main():
     profile_snapshot=None
     if args.profile:
         from calibration.profiles import ProfileStore
-        profile_snapshot=ProfileStore(config_root()/"data").snapshot(args.profile)
+        profile_snapshot=ProfileStore(config_root()/"data").snapshot(args.profile,include_templates=not bool(args.calibrate))
         config_path=profile_snapshot["config_path"]
         config_bytes=profile_snapshot["config_bytes"]
         cfg=profile_snapshot["config"]
@@ -708,10 +708,11 @@ def main():
     gui.park()
     gui.pause(0.5)
     if args.calibrate in ("enabled","disabled"):
-        path = config_path.parent / f"button_{args.calibrate}.png"
-        if path.exists():
-            raise ValueError(f"Vorlage existiert bereits: {path}. Fuer Neukalibrierung manuell umbenennen.")
-        gui.snapshot().crop(box(cfg["button_rect"])).save(path)
+        from io import BytesIO
+        from calibration.config_io import record_template
+        data=BytesIO()
+        gui.snapshot().crop(box(cfg["button_rect"])).save(data,format="PNG")
+        path=record_template(config_path,args.calibrate,data.getvalue(),hashlib.sha256(config_bytes).hexdigest())
         print("Vorlage gespeichert:", path)
         return 0
     output_root = profile_snapshot["output_root"] if profile_snapshot else (config_path.parent / cfg["output_dir"]).resolve()

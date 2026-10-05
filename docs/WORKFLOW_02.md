@@ -41,6 +41,12 @@ Managed output is `data/captures/<profile-uuid>/<run-id>/`; direct `--config`
 retains relative `output_dir`. The manifest records the profile UUID and hashes
 of the actual snapshot bytes (`profile: null` for direct configs).
 
+Button-template recording also uses store/UUID/config locks, rejects a stale
+config digest, validates the encoded PNG and publishes it atomically. Calibration
+may load config without templates to create missing templates; capture always
+requires the complete verified snapshot. CLI failures return exit code 2 without
+opening a modal dialog, including frozen executables and interrupted-run exports.
+
 The picker supports duplicate, left/top alignment, equal size and placement
 directly to the right of an explicit reference; default gap is zero physical
 pixels. Invalid geometry is rejected without changing the current selection.

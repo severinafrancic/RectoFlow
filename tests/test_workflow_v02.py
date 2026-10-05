@@ -30,6 +30,12 @@ import edge_capture as core
 
 
 class CalibrationV02Tests(unittest.TestCase):
+    def test_frozen_cli_failure_never_opens_modal_dialog(self):
+        import rectoflow
+        with patch.object(sys,"argv",["RectoFlow.exe","--rebuild","interrupted"]),patch.object(sys,"frozen",True,create=True),patch.object(rectoflow,"main",side_effect=ValueError("RUNNING")),patch.object(rectoflow.messagebox,"showerror") as dialog:
+            self.assertEqual(rectoflow.entrypoint(),2)
+            dialog.assert_not_called()
+
     def test_junction_alias_resolves_to_same_config_lock(self):
         with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
             folder=Path(td);target=folder/"target";target.mkdir();config=target/"Config.json";config.write_text("{}")
@@ -153,6 +159,31 @@ class CalibrationV02Tests(unittest.TestCase):
 
 class ProfileTests(unittest.TestCase):
     def cfg(self):return json.loads((ROOT/"config.json").read_bytes())
+
+    def test_template_recording_is_locked_atomic_and_rejects_stale_config(self):
+        from io import BytesIO
+        from calibration.config_io import record_template
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            store=ProfileStore(td);identifier=store.create("Book",self.cfg())
+            path=store.path(identifier)/"config.json"
+            cfg=self.cfg();cfg["button_mode"]="template"
+            atomic_update(path,cfg,digest(path.read_bytes()),lambda c:None)
+            snap=store.snapshot(identifier,include_templates=False)
+            image=BytesIO();Image.new("RGB",tuple(cfg["button_rect"][2:]),"green").save(image,format="PNG")
+            raw=image.getvalue()
+            with self.assertRaises(FileNotFoundError):store.snapshot(identifier)
+            with self.assertRaises(CalibrationError):record_template(path,"enabled",raw,"stale")
+            self.assertFalse((path.parent/"button_enabled.png").exists())
+            script="from calibration.config_io import record_template;import sys\nrecord_template(sys.argv[1],'enabled',bytes.fromhex(sys.argv[2]),sys.argv[3])"
+            with store.transaction([identifier]):
+                child=subprocess.run([sys.executable,"-c",script,str(path),raw.hex(),digest(snap["config_bytes"])],cwd=ROOT,capture_output=True,text=True,timeout=10)
+                self.assertNotEqual(child.returncode,0)
+                self.assertFalse((path.parent/"button_enabled.png").exists())
+            saved=record_template(path,"enabled",raw,digest(snap["config_bytes"]))
+            self.assertEqual(saved.read_bytes(),raw)
+            with self.assertRaises(ValueError):record_template(path,"enabled",raw,digest(snap["config_bytes"]))
+            record_template(path,"disabled",raw,digest(snap["config_bytes"]))
+            self.assertEqual(store.snapshot(identifier)["templates"]["enabled"],raw)
 
     def test_indexless_enumeration_duplicate_rename_and_output_root(self):
         with tempfile.TemporaryDirectory(dir=SCRATCH) as td:

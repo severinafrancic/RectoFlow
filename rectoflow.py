@@ -148,11 +148,16 @@ def main():
     return core.main()
 
 
-if __name__=="__main__":
+def entrypoint():
+    graphical = len(sys.argv)==1 or sys.argv[1:]==["--gui"]
     try:
-        raise SystemExit(main())
+        return main()
     except (Exception,KeyboardInterrupt) as error:
         print(f"STOPP: {type(error).__name__}: {error}",file=sys.stderr)
-        if getattr(sys,"frozen",False):
+        if graphical and getattr(sys,"frozen",False):
             messagebox.showerror("RectoFlow gestoppt",str(error))
-        raise SystemExit(2)
+        return 2
+
+
+if __name__=="__main__":
+    raise SystemExit(entrypoint())

@@ -56,7 +56,7 @@ class ProfileStore:
         except BaseException:
             stack.close();raise
 
-    def _snapshot(self,identifier):
+    def _snapshot(self,identifier,include_templates=True):
         path=self.path(identifier)
         if path.is_symlink() or getattr(path,"is_junction",lambda:False)():raise ValueError("Profilordner darf keine Umleitung sein.")
         meta=json.loads((path/"profile.json").read_bytes())
@@ -64,14 +64,14 @@ class ProfileStore:
             raise ValueError("Profilmetadaten ungueltig.")
         raw=(path/"config.json").read_bytes()
         cfg=json.loads(raw.decode("utf-8-sig"));validate_profile_config(cfg)
-        templates={key:(path/name).read_bytes() for key,name in TEMPLATES.items()} if cfg["button_mode"]=="template" and navigation(cfg)=="next_button" else {}
-        validate_templates(cfg,templates)
+        templates={key:(path/name).read_bytes() for key,name in TEMPLATES.items()} if include_templates and cfg["button_mode"]=="template" and navigation(cfg)=="next_button" else {}
+        if include_templates:validate_templates(cfg,templates)
         provenance={"uuid":identifier,"config_sha256":hashlib.sha256(raw).hexdigest(),"template_sha256":{key:hashlib.sha256(data).hexdigest() for key,data in templates.items()}}
         return {"metadata":meta,"config":cfg,"config_bytes":raw,"templates":templates,"profile":provenance,
                 "output_root":self.data/"captures"/identifier,"config_path":path/"config.json"}
 
-    def snapshot(self,identifier):
-        with self.transaction([identifier]):return self._snapshot(identifier)
+    def snapshot(self,identifier,include_templates=True):
+        with self.transaction([identifier]):return self._snapshot(identifier,include_templates)
 
     def enumerate(self):
         self.folder.mkdir(parents=True,exist_ok=True)

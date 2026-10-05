@@ -101,3 +101,25 @@ def restore(path, backup, validator):
         cfg = json.loads(data.decode("utf-8-sig"))
         validator(cfg)
         _atomic_update(path, cfg, hashlib.sha256(path.read_bytes()).hexdigest(), validator,exact_bytes=data)
+
+
+def record_template(path, state, data, expected_digest):
+    """Publish a complete new template while holding the snapshot reader's locks."""
+    from io import BytesIO
+    from PIL import Image
+    from .storage import atomic_bytes
+    if state not in ("enabled","disabled"):raise ValueError("Unbekannte Button-Vorlage.")
+    path=Path(final_path(path))
+    with config_transaction(path):
+        raw=path.read_bytes()
+        if hashlib.sha256(raw).hexdigest()!=expected_digest:
+            raise CalibrationError("CONFIG_WRITE_FAILED","Config wurde vor der Vorlagenaufnahme geaendert; neu starten.")
+        cfg=json.loads(raw.decode("utf-8-sig"))
+        with Image.open(BytesIO(data)) as image:
+            image.load()
+            if image.format!="PNG" or image.size!=tuple(cfg["button_rect"][2:]):
+                raise ValueError("Button-Vorlage hat ungueltiges Format oder Abmessungen.")
+        target=path.parent/f"button_{state}.png"
+        if target.exists():raise ValueError(f"Vorlage existiert bereits: {target}. Fuer Neukalibrierung manuell umbenennen.")
+        atomic_bytes(target,data)
+        return target
