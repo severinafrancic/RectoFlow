@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import sys
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox, simpledialog
 
 import edge_capture as core
 
@@ -23,15 +23,67 @@ def self_check():
 def launcher():
     root=tk.Tk()
     root.title("RectoFlow — Bereiche aufnehmen, PDF erstellen")
-    root.geometry("680x490")
+    root.geometry("760x720")
     selected=tk.StringVar(value=str(core.config_root()/"config.json"))
     ttk.Label(root,text="RectoFlow",font=("Segoe UI",24,"bold"),padding=15).pack(anchor="w")
     ttk.Label(root,text="Ein Bereich oder beliebig viele — Brave, Edge, Firefox und Chrome.\nBereiche ordnen, mit Weiter aufnehmen, Papierformat am Ende waehlen.",padding=12,wraplength=600).pack(anchor="w")
     ttk.Label(root,textvariable=selected,wraplength=590,padding=10).pack(anchor="w")
     action=None
+    from calibration.profiles import ProfileStore
+    store=ProfileStore(core.config_root()/"data")
+    profile_uuid=None
+    profile_rows=[]
+    profile_list=tk.Listbox(root,height=5)
+    ttk.Label(root,text="Profile (oder direkte Config unten verwenden)",padding=8).pack(anchor="w")
+    profile_list.pack(fill="x",padx=12)
+    def refresh_profiles():
+        nonlocal profile_rows
+        try:
+            profile_rows=store.enumerate();profile_list.delete(0,"end")
+            for item in profile_rows:profile_list.insert("end",item["name"]+("" if item["ready"] else " — NICHT BEREIT: "+item["reason"]))
+        except Exception as error:messagebox.showerror("Profile",str(error),parent=root)
+    def selected_profile():
+        if not profile_list.curselection():return None
+        item=profile_rows[profile_list.curselection()[0]]
+        if not item["ready"]:raise ValueError(item["reason"])
+        return item["uuid"]
+    def use_profile():
+        nonlocal profile_uuid
+        try:
+            profile_uuid=selected_profile()
+            if profile_uuid:selected.set(str(store.path(profile_uuid)/"config.json"))
+        except Exception as error:messagebox.showerror("Profil nicht bereit",str(error),parent=root)
+    profile_list.bind("<<ListboxSelect>>",lambda e:use_profile())
+    def profile_operation(operation):
+        try:
+            identifier=selected_profile()
+            name=simpledialog.askstring("Profilname","Name fuer das Profil:",parent=root)
+            if not name:return
+            if operation=="import":
+                path=filedialog.askopenfilename(parent=root,title="Config importieren",filetypes=[("Config","*.json")])
+                if path:store.import_config(path,name)
+            elif operation=="create":
+                cfg=json.loads((core.config_root()/"config.json").read_bytes())
+                choice=simpledialog.askstring("Vorlage","einzeln / doppelt / eigene",initialvalue="einzeln",parent=root)
+                if choice not in ("einzeln","doppelt","eigene"):return
+                if choice=="doppelt":
+                    first=core.capture_rects(cfg)[0];x,y,w,h=first;cfg["regions"]=[first,[x+w,y,w,h]]
+                elif choice=="einzeln":cfg["regions"]=[core.capture_rects(cfg)[0]]
+                store.create(name,cfg)
+            elif identifier and operation=="duplicate":store.duplicate(identifier,name)
+            elif identifier and operation=="rename":store.rename(identifier,name)
+            refresh_profiles()
+        except Exception as error:messagebox.showerror("Profil unveraendert",str(error),parent=root)
+    controls=ttk.Frame(root,padding=8);controls.pack(fill="x")
+    for label,operation in (("Neues Profil","create"),("Importieren","import"),("Duplizieren","duplicate"),("Umbenennen","rename")):
+        ttk.Button(controls,text=label,command=lambda op=operation:profile_operation(op)).pack(side="left",padx=3)
+    ttk.Button(controls,text="Aktualisieren",command=refresh_profiles).pack(side="left")
+    refresh_profiles()
     def choose():
+        nonlocal profile_uuid
         name=filedialog.askopenfilename(title="Konfiguration waehlen",filetypes=[("JSON-Konfiguration","*.json")],parent=root)
-        if name:selected.set(name)
+        if name:
+            profile_uuid=None;profile_list.selection_clear(0,"end");selected.set(name)
     def run(mode):
         nonlocal action
         action=mode
@@ -77,7 +129,7 @@ def launcher():
         if result:
             messagebox.showinfo("PDF fertig",f"Gespeichert:\n{path.parent/result['file']}")
         return 0
-    sys.argv=[sys.argv[0],"--config",selected.get()]+([] if action=="--capture" else [action])
+    sys.argv=[sys.argv[0]]+(["--profile",profile_uuid] if profile_uuid else ["--config",selected.get()])+([] if action=="--capture" else [action])
     return core.main()
 
 
