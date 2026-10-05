@@ -78,10 +78,14 @@ button{display:block;width:100px;height:60px;background:rgb(17,239,19);border:0;
         l,t,rr,b=button;cfg["button_rect"]=[l,t,rr-l,b-t];cfg["next_point"]=[(l+rr)//2,(t+b)//2]
         cfg["park_point"]=[max(5,selected["environment"]["window_bounds"][0]+15),max(5,selected["environment"]["window_bounds"][1]+15)]
         core.validate(cfg,gui.size)
-        gui.enabled=first.crop(core.box(cfg["button_rect"]))
+        from io import BytesIO
+        enabled=first.crop(core.box(cfg["button_rect"]))
         from PIL import Image
-        gui.disabled=Image.new("RGB",gui.enabled.size,(131,17,239))
-        if mode=="uia":gui.prepare_button()
+        disabled=Image.new("RGB",enabled.size,(131,17,239))
+        gui.template_bytes={}
+        for name,image in (("button_enabled.png",enabled),("button_disabled.png",disabled)):
+            data=BytesIO();image.save(data,format="PNG");gui.template_bytes[name]=data.getvalue()
+        gui.prepare_button()  # real snapshot-byte decoder in template mode, real UIA setup otherwise
         gui.park();gui.pause(.2)
         cfg["calibration"]={"schema":1,"coordinate_space":"primary_screen_physical_pixels","target":gui.target_metadata()}
         run=folder/"run";run.mkdir()
