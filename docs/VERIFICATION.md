@@ -1,4 +1,19 @@
-# Verification status for the initial prerelease
+# Verification status
+
+## 0.2 prerelease candidate
+
+New evidence must bind the final integrated SHA and package digests. Builder checks
+cover cross-process lock/crash semantics, Windows handle file identities including
+hard-link aliases, atomic backup publication, isolated profile/template bytes,
+schema-3 freeze and RUNNING exclusion, same-byte PNG decoding, plan/result hashes,
+review ordering and legacy/schema-3 relocated EXE exports.
+
+Owned Edge guest fixtures exercise real screenshots/input and UIA/template Next
+at observed 96 DPI. Interactive owner calibration, other physical DPI values and
+Chrome/Brave/Firefox composition remain unproven. Full Fresh Breaker runs on the
+integrated head; green builder tests/CI do not grant owner acceptance.
+
+## Historical initial prerelease
 
 Builder lifecycle: **INDEPENDENT_REVIEW_PENDING**. The exact release subject is
 recorded in the release's verification report, SHA256SUMS and BUILD_METADATA.json.

@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.2.0 — Calibration & Workflow UX (prerelease candidate)
+
+- Free capture geometry, explicit browser window picker and strict identity/focus ordering.
+- Native cross-process config/profile locks; retained byte-exact backups and restore.
+- Experimental single-use DOM bookmarklet/JSON file transport without clipboard writes.
+- Indexless UUID profiles, isolated config/template snapshots and manifest provenance.
+- Region duplicate/reference alignment/equal-size/direct-right helpers.
+- Frozen schema-3 capture manifests; lazy view review, exclusions and reordering.
+- Deterministic similarity/contrast warnings; unique ExportPlan views and linked PDF results.
+- Unified schema-3 GUI/CLI export; RUNNING runs remain recovery-required.
+- Windows console tolerates Unicode browser titles; relocated EXE tests cover legacy/new exports.
+- Main PR/Windows ruleset verified by an unmerged documentation smoke PR.
+
+Independent review and owner acceptance remain separate from builder tests/CI.
+
 - Clarify that one, two, three or more rectangles can be selected without a fixed
   rectangle-count limit. Replace mathematical wording in the README; capture
   behavior is unchanged.

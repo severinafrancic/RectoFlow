@@ -27,7 +27,13 @@ from reportlab.pdfgen import canvas
 from calibration.geometry import right_rect, PAPER_MM, assert_same_selection
 from calibration.regions import capture_rects, selection, image_names, navigation, browser_name
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
+
+
+def configure_console():
+    for stream in (sys.stdout,sys.stderr):
+        if hasattr(stream,"reconfigure"):
+            stream.reconfigure(errors="backslashreplace")
 
 def config_root():
     return Path(sys.executable).resolve().parent if getattr(sys,"frozen",False) else Path(__file__).resolve().parent
@@ -99,13 +105,8 @@ def code_identity():
 
 
 def write_json(path, data):
-    path = Path(path)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with tmp.open("w", encoding="utf-8") as stream:
-        json.dump(data, stream, ensure_ascii=False, indent=2)
-        stream.flush()
-        os.fsync(stream.fileno())
-    os.replace(tmp, path)
+    from calibration.storage import atomic_json
+    atomic_json(path,data)
 
 
 def validate(cfg, size):
@@ -170,6 +171,7 @@ def validate(cfg, size):
 class WindowsGUI:
     """Native Windows-Steuerung; bindet sich an das gewaehlte Edge-Fenster."""
     def __init__(self, cfg, config_dir):
+        configure_console()
         if sys.platform != "win32":
             raise RuntimeError("Dieses Skript braucht natives Windows.")
         self.cfg = cfg
@@ -416,8 +418,9 @@ class WindowsGUI:
         else:
             for attr, filename in (("enabled", "button_enabled.png"), ("disabled", "button_disabled.png")):
                 from io import BytesIO
-                source=BytesIO(self.template_bytes[filename]) if hasattr(self,"template_bytes") else self.config_dir/filename
-                with Image.open(source) as im:
+                if not hasattr(self,"template_bytes") or filename not in self.template_bytes:
+                    raise StopRun("Button-Template-Snapshot fehlt; Lauf neu vorbereiten.")
+                with Image.open(BytesIO(self.template_bytes[filename])) as im:
                     setattr(self, attr, im.convert("RGB"))
             expected = tuple(self.cfg["button_rect"][2:])
             if self.enabled.size != expected or self.disabled.size != expected:
@@ -589,11 +592,16 @@ def run_capture(gui, cfg, folder, manifest, confirmed_image=None):
 
 
 def build_pdf(folder, manifest, output):
-    """PDF aus dem Manifest, mit Hash-Pruefung und atomarer Fertigstellung."""
-    if manifest.get("schema",1) not in (1,2):
-        raise ValueError("Unbekanntes Aufnahmemanifest-Schema.")
-    if manifest.get("schema")==2 and "regions" not in manifest["config"]:
-        raise ValueError("Schema 2 braucht die geordnete regions-Liste.")
+    """Legacy export API. Schema 3 must use the persisted ExportPlan renderer."""
+    if manifest.get("schema")==3:
+        raise ValueError("Schema 3 erfordert einen gespeicherten ExportPlan.")
+    return _render_pdf(folder,manifest,output)
+
+
+def _render_pdf(folder,manifest,output,selected=None):
+    from calibration.exports import readable_manifest, view_images, pdf_options
+    readable_manifest(manifest)
+    pdf_options(manifest["config"])
     if not manifest["pairs"]:
         return False
     cfg = manifest["config"]
@@ -601,23 +609,9 @@ def build_pdf(folder, manifest, output):
     output = Path(output)
     tmp = output.with_suffix(output.suffix + ".tmp")
     pdf = canvas.Canvas(str(tmp), pageCompression=1)
-    pdf.setTitle("Edge Bildschirmaufnahmen")
-    for expected_index, pair in enumerate(manifest["pairs"], 1):
-        images = []
-        expected_names=image_names(cfg,expected_index)
-        if pair["index"] != expected_index or len(pair["images"]) != len(expected_names):
-            raise ValueError("Ungueltiges Bildpaar im Manifest.")
-        for expected_name,rect,entry in zip(expected_names,capture_rects(cfg),pair["images"]):
-            name = entry["file"]
-            if name != expected_name:
-                raise ValueError("Bildnamen/Reihenfolge im Manifest sind ungueltig.")
-            path = folder / name
-            if sha256(path) != entry["sha256"]:
-                raise ValueError(f"Beschaedigtes/geaendertes Zwischenbild: {name}")
-            with Image.open(path) as im:
-                if im.size!=tuple(rect[2:]):
-                    raise ValueError("Bildgroesse passt nicht zur gespeicherten Konfiguration.")
-                images.append(im.convert("RGB"))
+    pdf.setTitle("RectoFlow Capture")
+    for expected_index in (selected if selected is not None else range(1,len(manifest["pairs"])+1)):
+        images=view_images(folder,manifest,expected_index)
         if cfg["pdf_layout"] == "spread":
             joined = Image.new("RGB", (sum(im.width for im in images),max(im.height for im in images)), "white")
             offset=0
@@ -636,11 +630,13 @@ def build_pdf(folder, manifest, output):
             pdf.drawImage(ImageReader(im),(pw-w*scale)/2,(ph-h*scale)/2,width=w*scale,height=h*scale)
             pdf.showPage()
     pdf.save()
+    with tmp.open("r+b") as stream:os.fsync(stream.fileno())
     os.replace(tmp, output)
     return True
 
 
 def main():
+    configure_console()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version",action="version",version=f"RectoFlow {VERSION}")
     parser.add_argument("--config", type=Path, default=config_root()/"config.json")
@@ -653,10 +649,19 @@ def main():
     modes.add_argument("--calibrate", nargs="?", const="interactive", choices=["interactive","enabled","disabled"], help="Interaktive Kalibrierung; enabled/disabled: bisherige Button-Bildvorlagen")
     modes.add_argument("--rebuild", type=Path, metavar="RUN_ORDNER", help="PDF ohne Browsersteuerung neu erzeugen")
     parser.add_argument("--profile",metavar="UUID",help="Gespeichertes Profil verwenden")
+    parser.add_argument("--export-plan",type=Path,help="Gespeicherten ExportPlan bei --rebuild verwenden")
     args = parser.parse_args()
+    if args.export_plan and (not args.rebuild or any((args.paper,args.orientation,args.layout))):
+        parser.error("--export-plan erfordert --rebuild und darf nicht mit Format-Overrides kombiniert werden.")
     if args.rebuild:
         folder = args.rebuild.resolve()
-        manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
+        from calibration.exports import source_snapshot, create_plan, execute_plan
+        manifest,manifest_hash=source_snapshot(folder)
+        overrides={key:value for key,value in (("paper_format",args.paper),("paper_orientation",args.orientation),("pdf_layout",args.layout)) if value is not None}
+        if manifest.get("schema")==3 or args.export_plan:
+            plan=args.export_plan or create_plan(folder,options=overrides,expected_manifest_hash=manifest_hash)
+            print(execute_plan(folder,plan))
+            return 0
         import copy
         manifest=copy.deepcopy(manifest)
         for key,value in (("paper_format",args.paper),("paper_orientation",args.orientation),("pdf_layout",args.layout)):
@@ -736,7 +741,7 @@ def main():
     if "regions" in cfg or cfg.get("calibration",{}).get("requires_visual_confirmation"):
         from calibration.calibration import confirm_capture
         confirmed_image=confirm_capture(gui,cfg)
-    manifest = {"schema": 2 if "regions" in cfg else 1, "version":VERSION,"status": "RUNNING", "reason": "", "pairs": [], "config": cfg,
+    manifest = {"schema": 3, "version":VERSION,"status": "RUNNING", "reason": "", "pairs": [], "config": cfg,
                 "script_sha256": sha256(Path(__file__)), "started": datetime.now().astimezone().isoformat(),
                 "window_title": gui.title(), "screen_size": gui.size,
                 "python": sys.version, "platform": platform.platform(),
@@ -745,41 +750,35 @@ def main():
                 "profile":profile_snapshot["profile"] if profile_snapshot else None}
     if cfg["button_mode"] == "template":
         manifest["template_sha256"] = {name:hashlib.sha256(data).hexdigest() for name,data in gui.template_bytes.items()}
-    write_json(folder / "manifest.json", manifest)
+    from calibration.storage import exclusive
+    from calibration.exports import source_snapshot, create_plan, execute_plan
     exit_code = 2
-    try:
-        gui.prepare_button()
-        run_capture(gui, cfg, folder, manifest,confirmed_image=confirmed_image)
-        manifest["status"] = "COMPLETE"
-        exit_code = 0
-    except (Exception, KeyboardInterrupt) as error:
-        manifest["status"] = "STOPPED"
-        manifest["reason"] = f"{type(error).__name__}: {error}"
-        print("ABBRUCH:", manifest["reason"], flush=True)
-    finally:
-        manifest["finished"] = datetime.now().astimezone().isoformat()
+    with exclusive(folder/".writer.lock"):
         write_json(folder / "manifest.json", manifest)
-        filename = "gesamt.pdf" if manifest["status"] == "COMPLETE" else "gesamt_TEILSTAND.pdf"
         try:
-            if manifest["status"]=="COMPLETE" and cfg.get("confirm_pdf_export",False):
-                from calibration.pdf_export import export_dialog
-                exported=export_dialog(folder,manifest,build_pdf)
-                if exported is not None:
-                    manifest["pdf"]=exported
-                    print("PDF:",folder/exported["file"])
-                else:
-                    manifest["pdf_export_status"]="DEFERRED"
-                    print("PDF-Export aufgeschoben; PNGs/Manifest bleiben erhalten.")
-            elif build_pdf(folder, manifest, folder / filename):
-                manifest["pdf"] = {"file": filename, "sha256": sha256(folder / filename)}
-                print("PDF:", folder / filename)
+            gui.prepare_button()
+            run_capture(gui,cfg,folder,manifest,confirmed_image=confirmed_image)
+            manifest["status"]="COMPLETE";exit_code=0
         except (Exception, KeyboardInterrupt) as error:
-            manifest["status"] = "PDF_FAILED"
-            manifest["pdf_error"] = f"{type(error).__name__}: {error}"
-            exit_code = 2
-            print("PDF fehlgeschlagen; PNGs/Manifest bleiben erhalten:", error)
-        write_json(folder / "manifest.json", manifest)
-        print("Status:", manifest["status"], "; Ordner:", folder, flush=True)
+            manifest["status"]="STOPPED";manifest["reason"]=f"{type(error).__name__}: {error}"
+            print("ABBRUCH:",manifest["reason"],flush=True)
+        finally:
+            manifest["finished"]=datetime.now().astimezone().isoformat()
+            write_json(folder/"manifest.json",manifest)
+    frozen,manifest_hash=source_snapshot(folder)  # capture manifest is now frozen
+    try:
+        if frozen["pairs"]:
+            if cfg.get("confirm_pdf_export",False):
+                from calibration.pdf_export import export_dialog
+                exported=export_dialog(folder,frozen,build_pdf)
+                if exported:print("PDF:",folder/exported["file"])
+                else:print("Export aufgeschoben; Originalaufnahmen bleiben erhalten.")
+            else:
+                plan=create_plan(folder,expected_manifest_hash=manifest_hash)
+                print("PDF:",execute_plan(folder,plan))
+    except (Exception,KeyboardInterrupt) as error:
+        exit_code=2;print("PDF fehlgeschlagen; Capture bleibt eingefroren:",error,flush=True)
+    print("Status:",frozen["status"],"; Ordner:",folder,flush=True)
     return exit_code
 
 

@@ -7,7 +7,7 @@ from pathlib import Path
 import tempfile
 from datetime import datetime, timezone
 import uuid
-from .storage import config_transaction, LockBusy
+from .storage import config_transaction, LockBusy, final_path
 
 from .geometry import CalibrationError, contains, validate_selection
 from .regions import capture_names
@@ -39,6 +39,7 @@ def updated_config(original, rects, point, target, dom, navigation_mode=None):
 
 def atomic_update(path, cfg, expected_digest, validator):
     try:
+        path=Path(final_path(path))
         with config_transaction(path):
             return _atomic_update(path, cfg, expected_digest, validator)
     except (OSError, LockBusy) as error:
@@ -63,12 +64,17 @@ def _atomic_update(path, cfg, expected_digest, validator, exact_bytes=None):
         validator(json.loads(tmp.read_bytes()))
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
         backup = path.with_name(path.stem + ".backup." + stamp + "." + uuid.uuid4().hex[:8] + path.suffix)
-        with backup.open("xb") as stream:
-            stream.write(original)
-            stream.flush()
-            os.fsync(stream.fileno())
-        if backup.read_bytes() != original:
-            raise CalibrationError("CONFIG_WRITE_FAILED", "Backup konnte nicht verifiziert werden.")
+        backup_tmp=backup.with_suffix(backup.suffix+".tmp")
+        try:
+            with backup_tmp.open("xb") as stream:
+                stream.write(original)
+                stream.flush()
+                os.fsync(stream.fileno())
+            if backup_tmp.read_bytes()!=original:
+                raise CalibrationError("CONFIG_WRITE_FAILED", "Backup konnte nicht verifiziert werden.")
+            os.replace(backup_tmp,backup)
+        finally:
+            backup_tmp.unlink(missing_ok=True)
         if hashlib.sha256(path.read_bytes()).hexdigest() != expected_digest:
             raise CalibrationError("CONFIG_WRITE_FAILED", "Config-Konflikt unmittelbar vor dem Speichern.")
         os.replace(tmp, path)
@@ -82,12 +88,12 @@ def _atomic_update(path, cfg, expected_digest, validator, exact_bytes=None):
 
 
 def backups(path):
-    path = Path(path)
+    path = Path(final_path(path))
     return sorted(path.parent.glob(path.stem + ".backup.*" + path.suffix), reverse=True)
 
 
 def restore(path, backup, validator):
-    path, backup = Path(path), Path(backup)
+    path, backup = Path(final_path(path)), Path(backup)
     with config_transaction(path):
         if backup.resolve() not in [p.resolve() for p in backups(path)]:
             raise CalibrationError("CONFIG_WRITE_FAILED", "Backup gehoert nicht zu dieser Config.")

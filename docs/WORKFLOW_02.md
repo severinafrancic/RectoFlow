@@ -16,6 +16,13 @@ backs up the current file and restores the selected backup bytes. All backups ar
 retained; the launcher displays the latest ten. Foreign writers are outside the
 cooperative lock protocol.
 
+LOCK_IDENTITY_1: existing configs bind a native volume/file ID obtained from an
+opened handle; absent configs bind the final handle-resolved parent and normalized
+filename. Stable final-path locks survive atomic replacement; a file-ID mutex also
+serializes hard-link aliases. Case/dot/path aliases resolve to the same identity.
+Backups are written/flushed/verified under a .json.tmp name and atomically published
+as .json before config replacement. Restore enumeration ignores unfinished files.
+
 Screenshot selection is the default. The experimental HTML helper uses a local
 bookmarklet and a downloaded JSON result, never the clipboard. Tokens expire
 180 seconds after generation and are consumed once after valid import. CSP may
@@ -37,3 +44,23 @@ of the actual snapshot bytes (`profile: null` for direct configs).
 The picker supports duplicate, left/top alignment, equal size and placement
 directly to the right of an explicit reference; default gap is zero physical
 pixels. Invalid geometry is rejected without changing the current selection.
+
+New capture records use schema 3. Only COMPLETE/STOPPED plus finished may enter
+review/export. A writer holds its run lock until final manifest persistence. Hard
+interruption leaves RUNNING intact and excluded from normal export; no auto-finalize
+or resume. Legacy unknown-writer activity remains explicitly unknown.
+
+Each new export persists a unique ExportPlan before rendering. The actual stored
+bytes define its SHA-256 and parsed settings. GUI and schema-3 --rebuild share this
+renderer; absent --export-plan means a new all-views plan with effective defaults
+and optional CLI paper overrides. Existing plans reject conflicting overrides.
+
+PNG path read → SHA-256 check → BytesIO decode/load → dimension check → render
+that decoded object. Result schema 1 links plan/manifest/PDF hashes. Plan/manifest
+changes during rendering prevent COMPLETE. Export errors/cancellation never modify
+the capture manifest. COMPLETE PDFs remain proportional and browser-neutral.
+
+Analysis v1: corresponding regions, RGB 64×64 LANCZOS, mean absolute channel
+difference; similarity = 1 − difference/255, view mean across every region,
+warning at ≥0.995. Missing regions are not evaluable. Luminance population stddev
+at ≤2.0 warns on low contrast. Neither warning removes views automatically.

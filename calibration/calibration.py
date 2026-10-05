@@ -78,6 +78,9 @@ def choose_dom(root,token):
 
 def clean_dom(gui):
     gui.activate_target(cleanup=True)
+    before=gui.snapshot(areas=False,check_abort=False)
+    if marker_bounds(before,[217,227,37]) is None:
+        return before  # helper not executed; do not send F8 to unrelated page handlers
     gui.remove_dom_picker()
     gui.pause(.3,check_abort=False)
     image=gui.snapshot(areas=False,check_abort=False)
