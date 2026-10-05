@@ -151,6 +151,19 @@ def new_rect(a, b, bounds):
     return [min(ax, bx), min(ay, by), max(1, abs(ax - bx)), max(1, abs(ay - by))]
 
 
+def align_rect(rect,reference,operation,bounds,gap=0):
+    if type(gap) is not int or gap<0:
+        raise CalibrationError("INVALID_RECTANGLE","Abstand muss eine nichtnegative ganze Pixelzahl sein.")
+    result=list(rect)
+    if operation=="left":result[0]=reference[0]
+    elif operation=="top":result[1]=reference[1]
+    elif operation=="size":result[2:]=reference[2:]
+    elif operation=="right":result[:2]=[reference[0]+reference[2]+gap,reference[1]]
+    else:raise CalibrationError("INVALID_RECTANGLE","Unbekannte Geometrieaktion.")
+    validate_rect(result,bounds)
+    return result
+
+
 def canvas_transform(image_size, canvas_size):
     scale = min(canvas_size[0] / image_size[0], canvas_size[1] / image_size[1])
     return scale, (canvas_size[0] - image_size[0] * scale) / 2, (canvas_size[1] - image_size[1] * scale) / 2

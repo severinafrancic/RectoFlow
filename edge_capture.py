@@ -415,7 +415,9 @@ class WindowsGUI:
             self.auto = uiautomation
         else:
             for attr, filename in (("enabled", "button_enabled.png"), ("disabled", "button_disabled.png")):
-                with Image.open(self.config_dir / filename) as im:
+                from io import BytesIO
+                source=BytesIO(self.template_bytes[filename]) if hasattr(self,"template_bytes") else self.config_dir/filename
+                with Image.open(source) as im:
                     setattr(self, attr, im.convert("RGB"))
             expected = tuple(self.cfg["button_rect"][2:])
             if self.enabled.size != expected or self.disabled.size != expected:
@@ -650,6 +652,7 @@ def main():
     modes.add_argument("--preview", action="store_true", help="Bereiche pruefen, keine Weiter-Klicks")
     modes.add_argument("--calibrate", nargs="?", const="interactive", choices=["interactive","enabled","disabled"], help="Interaktive Kalibrierung; enabled/disabled: bisherige Button-Bildvorlagen")
     modes.add_argument("--rebuild", type=Path, metavar="RUN_ORDNER", help="PDF ohne Browsersteuerung neu erzeugen")
+    parser.add_argument("--profile",metavar="UUID",help="Gespeichertes Profil verwenden")
     args = parser.parse_args()
     if args.rebuild:
         folder = args.rebuild.resolve()
@@ -669,10 +672,22 @@ def main():
         return 0
     if any((args.paper,args.orientation,args.layout)):
         parser.error("--paper/--orientation/--layout sind fuer --rebuild. Aufnahmeauswahl in --calibrate aendern.")
-    config_path = args.config.resolve()
-    config_bytes = config_path.read_bytes()
-    cfg = json.loads(config_bytes.decode("utf-8-sig"))
+    profile_snapshot=None
+    if args.profile:
+        from calibration.profiles import ProfileStore
+        profile_snapshot=ProfileStore(config_root()/"data").snapshot(args.profile)
+        config_path=profile_snapshot["config_path"]
+        config_bytes=profile_snapshot["config_bytes"]
+        cfg=profile_snapshot["config"]
+    else:
+        from calibration.storage import config_transaction
+        config_path = args.config.resolve()
+        with config_transaction(config_path):
+            config_bytes = config_path.read_bytes()
+            cfg = json.loads(config_bytes.decode("utf-8-sig"))
+            template_bytes={name:(config_path.parent/name).read_bytes() for name in ("button_enabled.png","button_disabled.png")} if not args.calibrate and cfg["button_mode"]=="template" and navigation(cfg)=="next_button" else {}
     gui = WindowsGUI(cfg, config_path.parent)
+    gui.template_bytes={"button_"+key+".png":data for key,data in profile_snapshot["templates"].items()} if profile_snapshot else template_bytes
     if args.calibrate == "interactive":
         from calibration.calibration import calibrate
         return calibrate(gui,cfg,config_path,hashlib.sha256(config_bytes).hexdigest(),validate)
@@ -694,7 +709,7 @@ def main():
         gui.snapshot().crop(box(cfg["button_rect"])).save(path)
         print("Vorlage gespeichert:", path)
         return 0
-    output_root = (config_path.parent / cfg["output_dir"]).resolve()
+    output_root = profile_snapshot["output_root"] if profile_snapshot else (config_path.parent / cfg["output_dir"]).resolve()
     folder = output_root / ("run_" + datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:8])
     folder.mkdir(parents=True, exist_ok=False)
     if args.preview:
@@ -726,10 +741,10 @@ def main():
                 "window_title": gui.title(), "screen_size": gui.size,
                 "python": sys.version, "platform": platform.platform(),
                 "dependencies": {name: importlib.metadata.version(name) for name in ("Pillow", "reportlab", "uiautomation")},
-                "config_sha256": hashlib.sha256(config_bytes).hexdigest(),"code_tree":code_identity()}
+                "config_sha256": hashlib.sha256(config_bytes).hexdigest(),"code_tree":code_identity(),
+                "profile":profile_snapshot["profile"] if profile_snapshot else None}
     if cfg["button_mode"] == "template":
-        manifest["template_sha256"] = {name: sha256(config_path.parent / name)
-                                      for name in ("button_enabled.png", "button_disabled.png")}
+        manifest["template_sha256"] = {name:hashlib.sha256(data).hexdigest() for name,data in gui.template_bytes.items()}
     write_json(folder / "manifest.json", manifest)
     exit_code = 2
     try:

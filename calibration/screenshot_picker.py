@@ -6,7 +6,7 @@ from PIL import ImageTk
 
 from .geometry import (CalibrationError, center, contains, canvas_transform,
                        to_screen, move_rect, resize_rect, new_rect, fit_aspect,
-                       paper_ratio, validate_selection,resize_aspect)
+                       paper_ratio, validate_selection,resize_aspect,align_rect)
 from .regions import capture_names, NAVIGATION
 
 COLORS = {"LEFT":"#ff5252", "RIGHT":"#4ca6ff", "NEXT":"#41ef92", "PROGRESS":"#ffcf48"}
@@ -67,6 +67,15 @@ class RectanglePicker:
         nav=ttk.Combobox(formatbar,textvariable=nav_label,values=list(labels.values()),width=14,state="readonly")
         nav.pack(side="left")
         nav.bind("<<ComboboxSelected>>",lambda e:self.navigation.set(next(k for k,v in labels.items() if v==nav_label.get())))
+        geometrybar=ttk.Frame(self.window,padding=6);geometrybar.pack(fill="x")
+        ttk.Button(geometrybar,text="Duplizieren",command=self.duplicate_region).pack(side="left",padx=2)
+        ttk.Label(geometrybar,text="Referenz:").pack(side="left")
+        self.reference=ttk.Combobox(geometrybar,values=[self.display_name(n) for n in capture_names(self.rects)],state="readonly",width=12)
+        self.reference.pack(side="left");self.reference.current(0)
+        ttk.Label(geometrybar,text="Abstand px:").pack(side="left")
+        self.gap=tk.StringVar(value="0");ttk.Entry(geometrybar,textvariable=self.gap,width=5).pack(side="left")
+        for label,op in (("Links","left"),("Oben","top"),("Gleiche Groesse","size"),("Direkt rechts","right")):
+            ttk.Button(geometrybar,text=label,command=lambda o=op:self.align_selected(o)).pack(side="left",padx=2)
         footer = ttk.Frame(self.window,padding=6)
         footer.pack(side="bottom",fill="x")
         ttk.Button(footer,text=save_label or ("Bestaetigt speichern" if final else "Live-Vorschau"),command=self.accept).pack(side="right",padx=3)
@@ -96,6 +105,10 @@ class RectanglePicker:
     def refresh_selector(self):
         if hasattr(self,"selector"):
             self.selector.configure(values=[self.display_name(n) for n in self.rects])
+        if hasattr(self,"reference"):
+            names=capture_names(self.rects)
+            self.reference.configure(values=[self.display_name(n) for n in names])
+            if names:self.reference.current(0)
 
     def display_name(self,name):
         if name=="NEXT":return "Weiter-Button"
@@ -170,15 +183,21 @@ class RectanglePicker:
         except CalibrationError as error:
             messagebox.showerror("Papierformat",str(error),parent=self.window)
 
-    def copy_right(self):
-        rect = self.rects["LEFT"]
-        if rect:
-            x,y,w,h = rect
-            if x + 2*w <= self.bounds[2]:
-                self.rects["RIGHT"] = [x+w,y,w,h]
-                self.select("RIGHT")
-            else:
-                messagebox.showwarning("RIGHT","Rechts ist nicht genug Platz. RIGHT manuell aufziehen.",parent=self.window)
+    def duplicate_region(self):
+        if self.selected not in capture_names(self.rects) or self.rects[self.selected] is None:return
+        original=copy.deepcopy(self.rects[self.selected])
+        self.add_region();self.rects[self.selected]=original;self.mode="edit";self.render()
+
+    def align_selected(self,operation):
+        try:
+            names=capture_names(self.rects)
+            if self.selected not in names or self.rects[self.selected] is None:return
+            index=self.reference.current()
+            if not 0<=index<len(names) or self.rects[names[index]] is None:return
+            proposed=align_rect(self.rects[self.selected],self.rects[names[index]],operation,self.bounds,int(self.gap.get()))
+            self.rects[self.selected]=proposed;self.render()
+        except (ValueError,CalibrationError) as error:
+            messagebox.showwarning("Geometrie unveraendert",str(error),parent=self.window)
 
     def render(self):
         if not self.canvas.winfo_exists():

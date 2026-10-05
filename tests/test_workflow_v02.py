@@ -19,6 +19,8 @@ from calibration.config_io import atomic_update, backups, restore
 from calibration.geometry import CalibrationError
 from calibration.screenshot_picker import RectanglePicker
 from calibration.dom_picker import DOMSession
+from calibration.profiles import ProfileStore
+from calibration.geometry import align_rect
 from test_calibration import payload
 import edge_capture as core
 
@@ -96,6 +98,59 @@ class CalibrationV02Tests(unittest.TestCase):
             source=(ROOT/name).read_text(encoding="utf-8")
             for token in ("clipboard_get(","clipboard_clear(","clipboard_append(","navigator.clipboard","execCommand('copy')"):
                 self.assertNotIn(token,source)
+
+
+class ProfileTests(unittest.TestCase):
+    def cfg(self):return json.loads((ROOT/"config.json").read_bytes())
+
+    def test_indexless_enumeration_duplicate_rename_and_output_root(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            store=ProfileStore(td);identifier=store.create("Book",self.cfg())
+            copied=store.duplicate(identifier,"Copy");store.rename(copied,"Renamed")
+            bad=store.folder/"not-a-uuid";bad.mkdir();(bad/"profile.json").write_text("broken")
+            items=store.enumerate();self.assertEqual(sum(x["ready"] for x in items),2)
+            self.assertEqual(len(items),3);self.assertFalse((store.data/"profiles.json").exists())
+            snap=store.snapshot(copied);self.assertEqual(snap["metadata"]["name"],"Renamed")
+            self.assertEqual(snap["output_root"],store.data/"captures"/copied)
+            self.assertEqual(snap["profile"]["config_sha256"],hashlib.sha256(snap["config_bytes"]).hexdigest())
+
+    def test_template_snapshot_and_duplicate_are_isolated(self):
+        from io import BytesIO
+        from PIL import Image
+        def png(color):
+            data=BytesIO();Image.new("RGB",(80,60),color).save(data,format="PNG");return data.getvalue()
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            store=ProfileStore(td);cfg=self.cfg();cfg["button_mode"]="template"
+            templates={"enabled":png("green"),"disabled":png("gray")}
+            identifier=store.create("Templates",cfg,templates);copyid=store.duplicate(identifier,"Copy")
+            snap=store.snapshot(identifier)
+            (store.path(identifier)/"button_enabled.png").write_bytes(png("red"))
+            self.assertEqual(snap["templates"],templates)
+            self.assertEqual(store.snapshot(copyid)["templates"],templates)
+            self.assertEqual(snap["profile"]["template_sha256"]["enabled"],hashlib.sha256(templates["enabled"]).hexdigest())
+
+    def test_source_import_is_byte_preserving(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            source=Path(td)/"external.json";source.write_bytes(json.dumps(self.cfg(),indent=4).encode())
+            before=source.read_bytes();store=ProfileStore(Path(td)/"data")
+            identifier=store.import_config(source,"Imported")
+            self.assertEqual(source.read_bytes(),before);self.assertEqual(store.snapshot(identifier)["config_bytes"],before)
+
+    def test_store_lock_prevents_mutation_from_another_process(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            store=ProfileStore(td);identifier=store.create("Original",self.cfg())
+            script="from calibration.profiles import ProfileStore;import sys\nProfileStore(sys.argv[1]).rename(sys.argv[2],'Unexpected')"
+            with exclusive(store.locks/"profiles.lock"):
+                child=subprocess.run([sys.executable,"-c",script,str(store.data),identifier],cwd=ROOT,capture_output=True,text=True,timeout=10)
+            self.assertNotEqual(child.returncode,0)
+            self.assertEqual(store.snapshot(identifier)["metadata"]["name"],"Original")
+
+    def test_alignment_is_exact_and_invalid_action_preserves_original(self):
+        old=[100,50,30,60];ref=[10,20,40,70];bounds=[0,0,300,300]
+        self.assertEqual(align_rect(old,ref,"right",bounds),[50,20,30,60])
+        self.assertEqual(align_rect(old,ref,"size",bounds),[100,50,40,70])
+        with self.assertRaises(CalibrationError):align_rect(old,[280,20,40,70],"right",bounds)
+        self.assertEqual(old,[100,50,30,60])
 
 
 if __name__=="__main__":unittest.main()
