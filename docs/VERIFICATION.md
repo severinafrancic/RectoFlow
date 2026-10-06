@@ -8,10 +8,34 @@ hard-link aliases, atomic backup publication, isolated profile/template bytes,
 schema-3 freeze and RUNNING exclusion, same-byte PNG decoding, plan/result hashes,
 review ordering and legacy/schema-3 relocated EXE exports.
 
-Owned Edge guest fixtures exercise real screenshots/input and UIA/template Next
-at observed 96 DPI. Interactive owner calibration, other physical DPI values and
-Chrome/Brave/Firefox composition remain unproven. Full Fresh Breaker runs on the
-integrated head; green builder tests/CI do not grant owner acceptance.
+The current owner-authorized 0.2 contract separates implemented support,
+synthetic evidence and runtime evidence; [COMPATIBILITY.md](COMPATIBILITY.md)
+is authoritative for those terms and the exact historical Edge bindings.
+
+Required acceptance evidence on the new exact subject:
+
+- Full current regression suite, including four-browser identity/mismatch and
+  100/125/150% synthetic coordinate contracts; native Tk calibration/review smokes.
+- Successful Windows CI, portable build and actual relocated frozen EXE smoke.
+- Reproducible real-component synthetic README PNGs, clearly labelled as demos.
+- Current owned Edge UIA/template composition where reproducible, with observed
+  DPI; historical genuine interactive Edge calibration/review remains bound to
+  its original source/package. New package execution must be distinguished.
+- Independent review of runtime-code continuity, persistence/integrity/safety
+  regressions, honest claims and historical FBR-02-001/002/003 repairs.
+- Independent explicit reassessment of FBR-02-PROOF-004, then unchanged PR head,
+  current base, CI, mergeability/conflicts and separate owner acceptance.
+
+Non-blocking evidence backlog: actual Chrome/Brave/Firefox E2E, physical
+125%/150% desktop composition, full live profile/DOM lifecycle and remaining
+live adversarial combinations. Unit/native correctness tests for these contracts
+remain required. No confirmed product defect may be waived by relabelling evidence.
+The later own-Edge UIA top-level mismatch remains disclosed and fail-closed;
+provider reliability is not inferred from browser identity.
+
+Historical BLOCKED reports remain immutable. The old full-matrix requirement is
+superseded only by this explicit contract revision and an independent new verdict,
+not by deleting old findings. Green Builder tests/CI do not grant acceptance.
 
 ## Historical initial prerelease
 

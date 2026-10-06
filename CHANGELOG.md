@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Separate implemented/synthetic support from runtime verification; keep other
+  browser and physical DPI combinations explicitly unverified and non-blocking
+  for the early 0.2 prerelease, without weakening safety/integrity contracts.
+- Reproducible real-Tk README calibration/review screenshots using local synthetic
+  data, with repeatability checks and visible demo/evidence labels.
+
 ## 0.2.0 — Calibration & Workflow UX (prerelease candidate)
 
 - Free capture geometry, explicit browser window picker and strict identity/focus ordering.

@@ -1,5 +1,11 @@
 # RectoFlow
 
+**Status: Early Windows prerelease.** Edge is runtime-verified only for the
+[documented tested paths](docs/COMPATIBILITY.md). Chrome, Brave and Firefox support
+is implemented and contract-tested, but runtime E2E is **unverified**. Physical
+125%/150% desktop composition is also unverified. This is not production
+certification across every browser/DPI combination.
+
 <img src="assets/logo.svg" alt="RectoFlow logo" width="72">
 
 **Select screen regions. Capture each view in order. Export one PDF.**
@@ -11,6 +17,22 @@ capture a single view. At the end, choose the PDF paper size and orientation.
 
 [Deutsche Anleitung](README.de.md) · [User guide](docs/USER_GUIDE.md) ·
 [Browser compatibility](docs/COMPATIBILITY.md) · [MIT license](LICENSE)
+
+## Why this exists
+
+RectoFlow turns browser-based document views into ordered local PDFs when a
+reliable export is unavailable or manual screenshots would be repetitive and
+error-prone.
+
+## UI demo — synthetic data
+
+These are the real calibration and review components displaying deterministic
+local demo images. They contain no real webpages or documents and are **not
+runtime browser/DPI evidence**. [Regenerate the screenshots](docs/DEMO_ASSETS.md).
+
+![Real RectoFlow calibration UI with two synthetic capture regions, Next and progress](docs/assets/rectoflow-calibration.png)
+
+![Real RectoFlow review UI with synthetic views, a similarity warning and PDF options](docs/assets/rectoflow-review.png)
 
 The capture adapter uses native Windows screenshots; see the
 [FireShot integration assessment](docs/FIRESHOT.md).

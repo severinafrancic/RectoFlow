@@ -1,5 +1,9 @@
 # RectoFlow 0.2 workflow contracts
 
+Compatibility terminology and 0.2 acceptance requirements are defined in
+COMPATIBILITY.md and VERIFICATION.md. No safety, integrity or persistence invariant
+below is weakened by the non-blocking browser/DPI runtime-evidence backlog.
+
 Calibration uses freely sized rectangles. Paper settings never resize the capture
 selection automatically. The optional aspect-ratio action affects only the
 selected rectangle and requires confirmation.

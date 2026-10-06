@@ -1,5 +1,12 @@
 # RectoFlow
 
+**Status: frühe Windows-Vorabversion.** Edge ist nur für die
+[dokumentierten Testpfade](docs/COMPATIBILITY.md) real geprüft. Die Unterstützung
+für Chrome, Brave und Firefox ist implementiert und durch Vertragstests geprüft;
+reale E2E-Läufe sind **nicht verifiziert**. Physische Desktop-Läufe mit 125 % und
+150 % Skalierung sind ebenfalls nicht verifiziert. Eine Produktionszertifizierung
+für sämtliche Browser-/DPI-Kombinationen wird nicht behauptet.
+
 **Bereiche auswählen, Ansichten aufnehmen, eine PDF erstellen.**
 
 RectoFlow nimmt einen, zwei oder beliebig viele frei wählbare Bildschirmbereiche
@@ -9,6 +16,22 @@ oder nur eine Ansicht aufnehmen. Das Papierformat kannst du am Ende wählen.
 
 Ein, zwei, drei, vier und mehr Rechtecke sind möglich. Mit **+ Bereich** fügst du
 weitere hinzu; es gibt keine feste Obergrenze für die Anzahl der Rechtecke.
+
+## Warum es RectoFlow gibt
+
+RectoFlow macht aus Dokumentansichten im Browser geordnete lokale PDFs, wenn ein
+verlässlicher Export fehlt oder manuelle Screenshots viel Wiederholungsarbeit
+und Fehler verursachen würden.
+
+## UI-Demo mit synthetischen Daten
+
+Die echten Auswahl- und Kontrollkomponenten zeigen hier ausschließlich künstliche
+lokale Demobilder. Die Screenshots sind **keine Browser-/DPI-Laufzeitnachweise**.
+[Erzeugung und Grenzen](docs/DEMO_ASSETS.md).
+
+![Echte RectoFlow-Auswahl mit zwei synthetischen Bereichen und Weiter](docs/assets/rectoflow-calibration.png)
+
+![Echte RectoFlow-Kontrolle mit synthetischer Ähnlichkeitswarnung und PDF-Optionen](docs/assets/rectoflow-review.png)
 
 ## Windows starten
 

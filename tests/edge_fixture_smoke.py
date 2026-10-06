@@ -61,6 +61,34 @@ button{display:block;width:100px;height:60px;background:rgb(17,239,19);border:0;
             else:time.sleep(.2)
         if hwnd is None:raise RuntimeError("Eigenes Edge-Fenster nicht eindeutig an gestartete PID bindbar.")
         selected=inspect_window(gui,hwnd)
+        # Native test setup only: a non-foreground terminal parent may not grant
+        # SetForegroundWindow. Activate only the retained own ready window, using
+        # a fresh point-to-HWND guard. Never disable the product's focus checks.
+        if selected['identity'][0] != proc.pid or not selected['ready']:
+            raise RuntimeError('Own Edge fixture is not ready')
+        gui.user.SetWindowPos.argtypes=[W.HWND,W.HWND,ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_int,W.UINT]
+        gui.user.SetWindowPos.restype=W.BOOL
+        try:
+            if not gui.user.SetWindowPos(hwnd,W.HWND(-1),0,0,0,0,0x13):
+                raise ctypes.WinError(ctypes.get_last_error())
+            gui.user.SetForegroundWindow(hwnd)
+            if gui.user.GetForegroundWindow()!=hwnd:
+                live=inspect_window(gui,hwnd)
+                if any(live[k]!=selected[k] for k in ('identity','exe','environment')) or not live['ready']:
+                    raise RuntimeError('Owned fixture changed before activation')
+                l,t,r,b=live['environment']['window_bounds']
+                point=W.POINT(l+min(500,(r-l)//2),t+15)
+                gui.user.WindowFromPoint.argtypes=[W.POINT];gui.user.WindowFromPoint.restype=W.HWND
+                gui.user.GetAncestor.argtypes=[W.HWND,W.UINT];gui.user.GetAncestor.restype=W.HWND
+                if gui.user.GetAncestor(gui.user.WindowFromPoint(point),2)!=hwnd:
+                    raise RuntimeError('Own activation point is not reachable')
+                gui.user.SetCursorPos(point.x,point.y)
+                gui.user.mouse_event(0x0002,0,0,0,0);gui.user.mouse_event(0x0004,0,0,0,0)
+                time.sleep(.2)
+            if gui.user.GetForegroundWindow()!=hwnd:
+                raise RuntimeError('Own Edge foreground was not established')
+        finally:
+            gui.user.SetWindowPos(hwnd,W.HWND(-2),0,0,0,0,0x13)
         if not selected["ready"]:raise RuntimeError(selected["reason"])
         with patch("calibration.window_picker.choose_window",return_value=selected):gui.bind(check_config=False,check_calibration=False)
         gui.pause(1)

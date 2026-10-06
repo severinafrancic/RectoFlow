@@ -3,6 +3,9 @@
 ## 0.2 Calibration & Workflow UX
 
 Authoritative implementation contracts are in WORKFLOW_02.md and CONFIGURATION.md.
+The owner-authorized 0.2 compatibility/acceptance revision is in COMPATIBILITY.md
+and VERIFICATION.md. Implemented support is separate from runtime verification;
+missing other-browser/physical-DPI runs are a visible non-blocking evidence backlog.
 Three substantive PRs target integration/rectoflow-0.2: calibration/persistence,
 profiles/snapshot isolation, immutable review/export. Native config locks bind
 Windows file identity (including aliases), backups publish atomically, and each
@@ -20,7 +23,7 @@ Main protection has an unmerged smoke PR. Fresh Breaker reviews the integrated
 SHA after builder tests/build. Then final PR base/head/CI/conflicts are checked
 before owner acceptance. Material changes invalidate affected evidence; merge and
 release artifacts require new subject/digest binding. Known four-browser/physical
-DPI and owner calibration gaps remain explicit. No OCR/multi-monitor/plugin/grid/
+DPI and owner calibration evidence limits remain explicit. No OCR/multi-monitor/plugin/grid/
 compression/resume expansion in 0.2.
 
 ## Historical 0.1 implementation
