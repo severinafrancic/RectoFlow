@@ -27,12 +27,35 @@ RectoFlow.exe --version
 
 ## Architecture and verification
 
+The README demo generator is a Windows-only developer task using the real Tk
+components and local synthetic images. See [DEMO_ASSETS.md](DEMO_ASSETS.md).
+It needs no browser/network/user document or desktop-wide screenshot. CI checks
+repeatability and PNG validity; demo pixels are not runtime E2E evidence.
+
 `calibration/regions.py` owns the ordered region/browser/navigation contracts.
 `geometry.py` keeps physical screen, CSS and scaled canvas spaces separate.
-`screenshot_picker.py` edits geometry and paper aspect; `config_io.py` atomically
+`screenshot_picker.py` edits free geometry with an optional explicit aspect action; `config_io.py` atomically
 preserves configuration. `edge_capture.py` binds the selected native window and
 owns stable/changed-state capture, manifests and PDF integrity. `pdf_export.py`
 uses only saved images for final paper choice. `rectoflow.py` is the launcher/CLI.
+
+`storage.py` provides native process locks; `profiles.py` owns indexless profile
+transactions/snapshots; `exports.py` owns schema-3 freeze validation, persisted
+plans, same-byte image verification/decoding, analysis and linked export results.
+Profile and export state are independent of capture data. See WORKFLOW_02.md.
+
+Native Edge fixture (own localhost page and isolated guest profile; changes focus,
+never adopts an owner browser or changes desktop DPI):
+
+```powershell
+python tests/edge_fixture_smoke.py
+python tests/edge_fixture_smoke.py --uia
+```
+
+The three substantive PRs target the integration branch. One full Fresh Breaker
+reviews the integrated SHA, then the final PR base/head/CI/conflicts are checked
+before owner acceptance. Material changes invalidate affected evidence; main
+merge and release hashes need separate post-merge verification.
 
 One capture record becomes visible in the manifest only after all region PNGs are
 written. Record ordering and names are deterministic. Failed navigation is never
@@ -43,6 +66,8 @@ Tests must challenge wrong identities, deleted/reordered regions, count limits,
 unknown buttons, stale confirmed pixels, conflicting config writes, partial failure,
 recovery, paper fitting and frozen runtime composition. Browser executable-name
 tests are not real browser tests. A new substantive code tree invalidates old evidence.
+See COMPATIBILITY.md and VERIFICATION.md for current required gates versus the
+non-blocking real browser/DPI evidence backlog. Support never implies certification.
 
 The initial public release is a prerelease with the Builder lifecycle capped at
 INDEPENDENT_REVIEW_PENDING. Independent review can be blocked on unproved native

@@ -11,9 +11,13 @@ aufnahmen/
 button_enabled.png
 button_disabled.png
 local-config.json
+data/
+config.json.lock
+config.backup.*.json
 run_*/
 manifest.json
 *.png
+!docs/assets/*.png
 *.pdf
 *.spec
 !RectoFlow.spec

@@ -2,12 +2,14 @@
 import copy
 from datetime import datetime
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
+import webbrowser
+from pathlib import Path
 import uuid
 
 from .geometry import CalibrationError, right_rect, center, validate_rect, assert_same_selection
 from .config_io import updated_config, atomic_update
-from .dom_picker import snippet, parse_payload, suggestions, marker_bounds
+from .dom_picker import DOMSession, suggestions, marker_bounds
 from .screenshot_picker import RectanglePicker
 from .regions import selection, capture_names, navigation
 
@@ -30,28 +32,30 @@ def choose_dom(root,token):
     win.title("Stufe A: DOM-Auswahl (optional)")
     win.geometry("740x430")
     result={"mode":"cancel","copied":False}
-    text=("Das ausgewaehlte Edge-Fenster bleibt das Ziel.\n\n"
-          "Optional: lokalen DOM-Picker nutzen:\n"
-          "1. JavaScript kopieren. In Edge F12 > Konsole oeffnen.\n"
-          "2. DevTools als separates Fenster abdocken, damit sich die Seite nicht verkleinert.\n"
-          "3. Code pruefen, in der Konsole ausfuehren. Wenn Edge das Einfuegen sperrt:\n"
-          "   keine Schutzoption automatisch aendern; stattdessen manuell fortfahren.\n"
-          "4. LEFT, RIGHT, NEXT und optional PROGRESS klicken. ESC ueberspringt einen Schritt.\n"
-          "5. Im Picker Ergebnis kopieren, DevTools ohne Layoutwechsel schliessen.\n"
-          "6. Hier DOM-Daten uebernehmen. F8/Abbrechen entfernt den Browser-Picker.\n\n"
-          "Ohne DOM stehen alle Rechtecke im Screenshot-Picker zur manuellen Auswahl bereit.\n"
-          "Keine Seiteninhalte werden uebertragen. Der Code bleibt lokal.")
+    text=("Standard: Bereiche direkt im Screenshot markieren.\n\n"
+          "Optional: HTML-Auswahl als Startvorschlag (experimentell).\n"
+          "Hilfsseite oeffnen, Link in die Lesezeichenleiste ziehen, im Zieltab ausfuehren.\n"
+          "Ergebnisdatei speichern und hier importieren. Sitzung gilt 180 Sekunden.\n"
+          "F8 / Abbrechen entfernt den Browser-Picker. Wenn das Bookmarklet blockiert\n"
+          "wird, manuell fortfahren. Die Zwischenablage wird nicht verwendet.")
     ttk.Label(win,text=text,wraplength=710,padding=15,justify="left").pack(fill="both",expand=True)
     frame=ttk.Frame(win,padding=10)
     frame.pack(fill="x")
+    session=None
     def copied():
-        root.clipboard_clear()
-        root.clipboard_append(snippet(token))
-        root.update()
-        result["copied"]=True
+        nonlocal session
+        if session: session.cancel()
+        session=DOMSession()
+        import edge_capture
+        path=session.write_helper(edge_capture.config_root()/"data"/"sessions")
+        result["copied"]=True  # browser cleanup needed, no clipboard activity
+        webbrowser.open(path.as_uri())
     def accept():
         try:
-            result["payload"]=parse_payload(root.clipboard_get(),token)
+            if session is None: raise CalibrationError("DOM_PICKER_FAILED","Zuerst eine Sitzung starten.")
+            path=filedialog.askopenfilename(parent=win,title="Ergebnisdatei importieren",filetypes=[("DOM-Ergebnis","*.json")])
+            if not path:return
+            result["payload"]=session.import_file(path)
             result["mode"]="dom"
             win.destroy()
         except (tk.TclError,CalibrationError) as error:
@@ -61,18 +65,22 @@ def choose_dom(root,token):
         win.destroy()
     def cancel():
         win.destroy()
-    ttk.Button(frame,text="JavaScript kopieren",command=copied).pack(side="left",padx=3)
-    ttk.Button(frame,text="DOM-Daten uebernehmen",command=accept).pack(side="left",padx=3)
     ttk.Button(frame,text="Manuell ohne DOM",command=manual).pack(side="left",padx=3)
+    ttk.Button(frame,text="HTML-Hilfsseite",command=copied).pack(side="left",padx=3)
+    ttk.Button(frame,text="Ergebnis importieren",command=accept).pack(side="left",padx=3)
     ttk.Button(frame,text="Abbrechen",command=cancel).pack(side="left",padx=3)
     win.bind("<Escape>",lambda e:cancel())
     win.protocol("WM_DELETE_WINDOW",cancel)
     root.wait_window(win)
+    if session:session.cancel()
     return result
 
 
 def clean_dom(gui):
     gui.activate_target(cleanup=True)
+    before=gui.snapshot(areas=False,check_abort=False)
+    if marker_bounds(before,[217,227,37]) is None:
+        return before  # helper not executed; do not send F8 to unrelated page handlers
     gui.remove_dom_picker()
     gui.pause(.3,check_abort=False)
     image=gui.snapshot(areas=False,check_abort=False)
@@ -97,27 +105,14 @@ def fresh_image(gui,park=False):
 def calibrate(gui,cfg,path,expected_digest,validator):
     root=None
     copied=False
-    previous_clipboard=None
-    owned_text=None
     try:
-        print(f"{cfg['start_delay']} Sekunden: Ziel-Edge auf den Hauptmonitor bringen. Keine Aufnahme startet.",flush=True)
-        gui.pause(cfg["start_delay"])
         gui.bind(check_config=False,check_calibration=False)
         target=gui.target_metadata()
         root=tk.Tk()
         root.withdraw()
-        try:
-            previous_clipboard=root.clipboard_get()
-        except tk.TclError:
-            pass
         token=uuid.uuid4().hex
         choice=choose_dom(root,token)
         copied=choice["copied"]
-        if copied:
-            try:
-                owned_text=root.clipboard_get()
-            except tk.TclError:
-                pass
         if choice["mode"]=="cancel":
             raise CalibrationError("CALIBRATION_CANCELLED","Keine Einstellungen gespeichert.")
         diagnostic=None
@@ -184,15 +179,6 @@ def calibrate(gui,cfg,path,expected_digest,validator):
             except Exception as error:
                 print("DOM_PICKER_FAILED: Cleanup nicht bestaetigt:",error,"; F8 im Zieltab entfernt den Picker, sonst nach 180 s.",flush=True)
         if root is not None:
-            try:
-                current=root.clipboard_get()
-                if current==owned_text:
-                    root.clipboard_clear()
-                    if previous_clipboard is not None:
-                        root.clipboard_append(previous_clipboard)
-                    root.update()
-            except tk.TclError:
-                pass
             root.destroy()
 
 

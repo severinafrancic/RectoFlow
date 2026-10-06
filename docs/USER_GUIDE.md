@@ -11,6 +11,8 @@ RectoFlow.exe --preview
 RectoFlow.exe --capture
 RectoFlow.exe --position
 RectoFlow.exe --rebuild "aufnahmen\run_..." --paper A5 --orientation landscape --layout separate
+RectoFlow.exe --rebuild "aufnahmen\run_..." --export-plan "aufnahmen\run_...\exports\...\export_plan.json"
+RectoFlow.exe --profile "<profile-uuid>" --capture
 RectoFlow.exe --version
 RectoFlow.exe --self-check
 ```
@@ -40,15 +42,16 @@ choose manual navigation. A disappearing button is `unknown`, not proved disable
 
 ## End export and recovery
 
-After successful calibrated acquisition, the final dialog uses saved PNGs. Select
+After completed or stopped calibrated acquisition, the review uses saved PNGs. Select
 paper and orientation, inspect the representative first-page preview, then confirm
 PDF creation. Separate layout exports every region as a page; spread puts each view's
 regions side by side. Original dimensions use `pdf_dpi` for PDF points. All other
 formats use true paper millimetres with proportional fit and optional white margins.
 
-Cancel keeps PNGs and `manifest.json`. The launcher can reopen any run manifest for
-another confirmed export. CLI rebuild with format options produces a new uniquely
-named PDF and leaves the recorded capture configuration/PNGs unchanged. Legacy
+Cancel keeps PNGs and `manifest.json`. The launcher can reopen finished run manifests,
+exclude/reorder whole views and warn about similar/low-contrast images without
+automatic removal. Schema-3 CLI rebuild always creates/uses a persisted ExportPlan
+and writes its PDF/result in an independent export folder. Legacy
 rebuild without options preserves its existing no-overwrite filename behavior.
 
 ## Failure codes and troubleshooting
@@ -66,4 +69,6 @@ Next button can resemble the end, so known view counts are useful.
 
 Captured PNGs/metadata stay in the configured output directory. Partial writes are
 not added as complete records. There is no automatic restart or resume of navigation.
-Use rebuild for saved records and choose the correct start view for a new acquisition.
+Use rebuild for COMPLETE/STOPPED records and choose the correct start view for a
+new acquisition. RUNNING records after a crash are recovery-required, never
+silently completed/exported; controlled finalization/resume is outside version 0.2.

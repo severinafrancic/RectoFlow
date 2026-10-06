@@ -1,15 +1,62 @@
-"""DOM-Daten aus lokaler Zwischenablage; Marker statt erfundener Chrome-Offsets."""
+"""Local file transport; single-use sessions, measured browser markers."""
 import json
-import math
+from .geometry import finite_number
 from pathlib import Path
 import time
+import uuid
+import threading
+import html
+from urllib.parse import quote
+
+_sessions = {}
+_session_lock = threading.Lock()
+
+
+class DOMSession:
+    def __init__(self):
+        self.token = uuid.uuid4().hex
+        self.created_ms = int(time.time()*1000)
+        self.started = time.monotonic()
+        with _session_lock:
+            _sessions[self.token] = self
+
+    def cancel(self):
+        with _session_lock:
+            _sessions.pop(self.token,None)
+
+    def import_file(self,path):
+        with _session_lock:
+            if _sessions.get(self.token) is not self or not 0 <= time.monotonic()-self.started <= 180:
+                raise CalibrationError("DOM_PICKER_FAILED","Sitzung abgelaufen oder bereits verwendet.")
+            with Path(path).open("r",encoding="utf-8") as stream:
+                text = stream.read(32001)
+            payload = parse_payload(text,self.token)
+            if payload["created_ms"] != self.created_ms:
+                raise CalibrationError("DOM_PICKER_FAILED","Falscher Sitzungsbeginn.")
+            del _sessions[self.token]
+            return payload
+
+    def write_helper(self,folder):
+        folder=Path(folder); folder.mkdir(parents=True,exist_ok=True)
+        path=folder/("session-"+self.token+".html")
+        url="javascript:"+quote(snippet(self.token,self.created_ms),safe="")
+        path.write_text('<!doctype html><meta charset="utf-8"><title>RectoFlow HTML-Auswahl</title>'
+            '<h1>Experimentelle HTML-Auswahl</h1><p>Diesen Link in die Lesezeichenleiste ziehen. '
+            'Dann im gewaehlten Browserfenster auf das Lesezeichen klicken. Sitzung: 180 Sekunden.</p>'
+            '<p><a href="'+html.escape(url,quote=True)+'">RectoFlow Auswahl</a></p>'
+            '<p>Bereiche auswaehlen, Ergebnisdatei speichern und in RectoFlow importieren. '
+            'F8 entfernt die Auswahl. Bei blockiertem Bookmarklet manuell fortfahren.</p>',encoding="utf-8")
+        return path
 
 from PIL import Image, ImageChops
 from .geometry import CalibrationError, css_to_screen, measured_mapping, validate_rect
 
 
-def snippet(token):
-    return Path(__file__).with_suffix(".js").read_text(encoding="utf-8").replace("__SESSION_TOKEN__", token)
+def snippet(token,created_ms=None):
+    if not token.isalnum():
+        raise ValueError("Invalid session token.")
+    created_ms=int(time.time()*1000) if created_ms is None else int(created_ms)
+    return Path(__file__).with_suffix(".js").read_text(encoding="utf-8").replace("__SESSION_TOKEN__",token).replace("__SESSION_STARTED__",str(created_ms))
 
 
 def parse_payload(text, token, now=None):
@@ -27,7 +74,7 @@ def parse_payload(text, token, now=None):
         if len(data["viewport"])!=2 or len(data["scroll"])!=2 or not .25 <= data["dpr"] <= 8:
             raise ValueError("Ungueltige DOM-Skalierung.")
         for v in [data["dpr"], *data["viewport"], *data["scroll"]]:
-            if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+            if not finite_number(v):
                 raise ValueError("Ungueltige DOM-Koordinaten.")
         if not 180 <= data["viewport"][0] <= 32000 or not 180 <= data["viewport"][1] <= 32000:
             raise ValueError("Ungueltiger Viewport.")
@@ -42,7 +89,7 @@ def parse_payload(text, token, now=None):
             r = data["rects"].get(name)
             if r is not None:
                 values=[r[k] for k in ("left","top","right","bottom","width","height")]
-                if any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) for v in values) or r["width"]<=0 or r["height"]<=0 or abs(r["right"]-r["left"]-r["width"])>.01 or abs(r["bottom"]-r["top"]-r["height"])>.01:
+                if any(not finite_number(v) for v in values) or r["width"]<=0 or r["height"]<=0 or abs(r["right"]-r["left"]-r["width"])>.01 or abs(r["bottom"]-r["top"]-r["height"])>.01:
                     raise ValueError("Ungueltiges DOM-Rechteck.")
                 rects[name] = {k:r[k] for k in ("left","top","right","bottom","width","height")}
         return {k:data[k] for k in ("schema","token","created_ms","dpr","viewport","scroll","visual_scale","markers")} | {"rects":rects}

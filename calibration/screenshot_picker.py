@@ -6,7 +6,7 @@ from PIL import ImageTk
 
 from .geometry import (CalibrationError, center, contains, canvas_transform,
                        to_screen, move_rect, resize_rect, new_rect, fit_aspect,
-                       paper_ratio, validate_selection,resize_aspect)
+                       paper_ratio, validate_selection,resize_aspect,align_rect)
 from .regions import capture_names, NAVIGATION
 
 COLORS = {"LEFT":"#ff5252", "RIGHT":"#4ca6ff", "NEXT":"#41ef92", "PROGRESS":"#ffcf48"}
@@ -45,7 +45,7 @@ class RectanglePicker:
         ttk.Button(toolbar,text="Klickpunkt setzen",command=self.set_point).pack(side="left",padx=3)
         formatbar=ttk.Frame(self.window,padding=6)
         formatbar.pack(fill="x")
-        ttk.Label(formatbar,text="Papier:").pack(side="left")
+        ttk.Label(formatbar,text="Optionales Seitenverhaeltnis:").pack(side="left")
         self.paper = tk.StringVar(value=paper)
         self.orientation = tk.StringVar(value=orientation)
         from .geometry import PAPER_MM
@@ -59,6 +59,7 @@ class RectanglePicker:
             self.orientation.set("landscape" if direction_label.get()=="Querformat" else "portrait")
             self.paper_changed()
         direction.bind("<<ComboboxSelected>>",direction_changed)
+        ttk.Button(formatbar,text="Ausgewaehlten Bereich anpassen",command=self.fit_selected).pack(side="left",padx=4)
         self.navigation=tk.StringVar(value=navigation_mode)
         ttk.Label(formatbar,text="Navigation:").pack(side="left",padx=5)
         labels={"next_button":"Weiter-Button","manual":"Manuell","none":"Einmal"}
@@ -66,6 +67,15 @@ class RectanglePicker:
         nav=ttk.Combobox(formatbar,textvariable=nav_label,values=list(labels.values()),width=14,state="readonly")
         nav.pack(side="left")
         nav.bind("<<ComboboxSelected>>",lambda e:self.navigation.set(next(k for k,v in labels.items() if v==nav_label.get())))
+        geometrybar=ttk.Frame(self.window,padding=6);geometrybar.pack(fill="x")
+        ttk.Button(geometrybar,text="Duplizieren",command=self.duplicate_region).pack(side="left",padx=2)
+        ttk.Label(geometrybar,text="Referenz:").pack(side="left")
+        self.reference=ttk.Combobox(geometrybar,values=[self.display_name(n) for n in capture_names(self.rects)],state="readonly",width=12)
+        self.reference.pack(side="left");self.reference.current(0)
+        ttk.Label(geometrybar,text="Abstand px:").pack(side="left")
+        self.gap=tk.StringVar(value="0");ttk.Entry(geometrybar,textvariable=self.gap,width=5).pack(side="left")
+        for label,op in (("Links","left"),("Oben","top"),("Gleiche Groesse","size"),("Direkt rechts","right")):
+            ttk.Button(geometrybar,text=label,command=lambda o=op:self.align_selected(o)).pack(side="left",padx=2)
         footer = ttk.Frame(self.window,padding=6)
         footer.pack(side="bottom",fill="x")
         ttk.Button(footer,text=save_label or ("Bestaetigt speichern" if final else "Live-Vorschau"),command=self.accept).pack(side="right",padx=3)
@@ -95,6 +105,10 @@ class RectanglePicker:
     def refresh_selector(self):
         if hasattr(self,"selector"):
             self.selector.configure(values=[self.display_name(n) for n in self.rects])
+        if hasattr(self,"reference"):
+            names=capture_names(self.rects)
+            self.reference.configure(values=[self.display_name(n) for n in names])
+            if names:self.reference.current(0)
 
     def display_name(self,name):
         if name=="NEXT":return "Weiter-Button"
@@ -155,24 +169,35 @@ class RectanglePicker:
         self.render()
 
     def paper_changed(self,event=None):
+        self.render()
+
+    def fit_selected(self):
         try:
             ratio = paper_ratio(self.paper.get(),self.orientation.get())
-            for name in capture_names(self.rects):
-                if self.rects[name] is not None:
-                    self.rects[name] = fit_aspect(self.rects[name],ratio,self.bounds)
+            if self.selected not in capture_names(self.rects) or self.rects[self.selected] is None:
+                return
+            proposed = fit_aspect(self.rects[self.selected],ratio,self.bounds)
+            if messagebox.askyesno("Bereich anpassen",f"{self.rects[self.selected]} → {proposed}\nDiese Geometrie uebernehmen?",parent=self.window):
+                self.rects[self.selected] = proposed
             self.render()
         except CalibrationError as error:
             messagebox.showerror("Papierformat",str(error),parent=self.window)
 
-    def copy_right(self):
-        rect = self.rects["LEFT"]
-        if rect:
-            x,y,w,h = rect
-            if x + 2*w <= self.bounds[2]:
-                self.rects["RIGHT"] = [x+w,y,w,h]
-                self.select("RIGHT")
-            else:
-                messagebox.showwarning("RIGHT","Rechts ist nicht genug Platz. RIGHT manuell aufziehen.",parent=self.window)
+    def duplicate_region(self):
+        if self.selected not in capture_names(self.rects) or self.rects[self.selected] is None:return
+        original=copy.deepcopy(self.rects[self.selected])
+        self.add_region();self.rects[self.selected]=original;self.mode="edit";self.render()
+
+    def align_selected(self,operation):
+        try:
+            names=capture_names(self.rects)
+            if self.selected not in names or self.rects[self.selected] is None:return
+            index=self.reference.current()
+            if not 0<=index<len(names) or self.rects[names[index]] is None:return
+            proposed=align_rect(self.rects[self.selected],self.rects[names[index]],operation,self.bounds,int(self.gap.get()))
+            self.rects[self.selected]=proposed;self.render()
+        except (ValueError,CalibrationError) as error:
+            messagebox.showwarning("Geometrie unveraendert",str(error),parent=self.window)
 
     def render(self):
         if not self.canvas.winfo_exists():
@@ -238,10 +263,7 @@ class RectanglePicker:
         start,old,kind,old_point=self.drag
         p=to_screen((event.x,event.y),self.transform)
         dx,dy=p[0]-start[0],p[1]-start[1]
-        ratio=paper_ratio(self.paper.get(),self.orientation.get()) if self.selected in capture_names(self.rects) else None
-        rect=new_rect(start,p,self.bounds) if kind=="draw" else move_rect(old,dx,dy,self.bounds) if kind=="move" else resize_aspect(old,kind,dx,dy,self.bounds,ratio)
-        if self.selected in capture_names(self.rects) and kind=="draw":
-            rect=fit_aspect(rect,paper_ratio(self.paper.get(),self.orientation.get()),self.bounds)
+        rect=new_rect(start,p,self.bounds) if kind=="draw" else move_rect(old,dx,dy,self.bounds) if kind=="move" else resize_rect(old,kind,dx,dy,self.bounds)
         self.rects[self.selected]=rect
         if self.selected == "NEXT":
             shifted=[old_point[0]+rect[0]-old[0],old_point[1]+rect[1]-old[1]] if kind=="move" and old_point and old else None

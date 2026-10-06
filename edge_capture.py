@@ -24,10 +24,16 @@ import uuid
 from PIL import Image, ImageChops, ImageDraw, ImageStat
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
-from calibration.geometry import right_rect, PAPER_MM, assert_same_selection
+from calibration.geometry import right_rect, PAPER_MM, assert_same_selection, finite_number
 from calibration.regions import capture_rects, selection, image_names, navigation, browser_name
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
+
+
+def configure_console():
+    for stream in (sys.stdout,sys.stderr):
+        if hasattr(stream,"reconfigure"):
+            stream.reconfigure(errors="backslashreplace")
 
 def config_root():
     return Path(sys.executable).resolve().parent if getattr(sys,"frozen",False) else Path(__file__).resolve().parent
@@ -99,19 +105,15 @@ def code_identity():
 
 
 def write_json(path, data):
-    path = Path(path)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with tmp.open("w", encoding="utf-8") as stream:
-        json.dump(data, stream, ensure_ascii=False, indent=2)
-        stream.flush()
-        os.fsync(stream.fileno())
-    os.replace(tmp, path)
+    from calibration.storage import atomic_json
+    atomic_json(path,data)
 
 
 def validate(cfg, size):
+    if not isinstance(cfg,dict):raise ValueError("Config muss ein JSON-Objekt sein.")
     def positive(key):
         value = cfg[key]
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+        if not finite_number(value) or value <= 0:
             raise ValueError(f"{key} muss eine positive endliche Zahl sein.")
 
     def rect(value, name):
@@ -148,7 +150,7 @@ def validate(cfg, size):
                 "min_after_click", "timeout_seconds", "pdf_dpi", "change_threshold",
                 "template_tolerance", "template_margin"):
         positive(key)
-    if isinstance(cfg["stable_tolerance"], bool) or not isinstance(cfg["stable_tolerance"], (int, float)) or not math.isfinite(cfg["stable_tolerance"]) or not 0 <= cfg["stable_tolerance"] < cfg["change_threshold"]:
+    if not finite_number(cfg["stable_tolerance"]) or not 0 <= cfg["stable_tolerance"] < cfg["change_threshold"]:
         raise ValueError("0 <= stable_tolerance < change_threshold erforderlich.")
     if cfg["timeout_seconds"] <= max(cfg["disabled_seconds"], cfg["stable_seconds"]) + cfg["min_after_click"]:
         raise ValueError("timeout_seconds ist fuer die Wartezeiten zu kurz.")
@@ -170,6 +172,7 @@ def validate(cfg, size):
 class WindowsGUI:
     """Native Windows-Steuerung; bindet sich an das gewaehlte Edge-Fenster."""
     def __init__(self, cfg, config_dir):
+        configure_console()
         if sys.platform != "win32":
             raise RuntimeError("Dieses Skript braucht natives Windows.")
         self.cfg = cfg
@@ -197,6 +200,11 @@ class WindowsGUI:
         self.user.MonitorFromWindow.restype = W.HANDLE
         self.user.SetForegroundWindow.argtypes = [W.HWND]
         self.user.IsWindow.argtypes = [W.HWND]
+        self.user.IsWindowVisible.argtypes = [W.HWND]
+        self.user.IsIconic.argtypes = [W.HWND]
+        self.user.SetPropW.argtypes = [W.HWND,W.LPCWSTR,W.HANDLE]
+        self.user.GetPropW.argtypes = [W.HWND,W.LPCWSTR]
+        self.user.GetPropW.restype = W.HANDLE
         # DPI-Kontext vor ImageGrab/UIA/Koordinatenabfragen setzen.
         try:
             self.user.SetProcessDpiAwarenessContext.argtypes = [ctypes.c_void_p]
@@ -243,7 +251,32 @@ class WindowsGUI:
         return (r.left, r.top, r.right, r.bottom)
 
     def bind(self, check_config=True, check_calibration=True):
-        self.hwnd = self.user.GetForegroundWindow()
+        from calibration.window_picker import choose_window, inspect_window
+        selected = choose_window(self)
+        self.hwnd = selected["hwnd"]
+        live = inspect_window(self,self.hwnd)
+        if not live["ready"] or any(live[k]!=selected[k] for k in ("identity","exe","environment")):
+            raise StopRun("TARGET_WINDOW_LOST: Auswahl ist nicht mehr aktuell.")
+        self.browser = live["browser"]
+        self.bound_exe = live["exe"]
+        self.initial_geometry = tuple(live["environment"]["window_bounds"])
+        self.bound_identity = live["identity"]
+        self.bound_environment = live["environment"]
+        self.window_property = "RectoFlow-" + uuid.uuid4().hex
+        if not self.user.SetPropW(self.hwnd,self.window_property,W.HANDLE(1)):
+            raise StopRun("TARGET_WINDOW_LOST: Fenster-Lebensdauer nicht bindbar.")
+        calibrated = self.cfg.get("calibration")
+        if check_calibration and calibrated:
+            if calibrated.get("coordinate_space") != "primary_screen_physical_pixels" or calibrated.get("schema") != 1:
+                raise StopRun("RECALIBRATION_REQUIRED: unbekanntes Kalibrierungsformat.")
+            old = calibrated["target"]
+            if any(old[key] != self.bound_environment[key] for key in ("window_bounds","screen_size","dpi","monitor")):
+                raise StopRun("RECALIBRATION_REQUIRED: Fenster, Monitor oder DPI weichen von der Kalibrierung ab.")
+        self.activate_target()
+        self.guard(areas=check_config)
+        print("Gebunden an",self.browser,":",self.title(),flush=True)
+
+    def process_executable(self):
         pid = W.DWORD()
         self.user.GetWindowThreadProcessId(self.hwnd, ctypes.byref(pid))
         handle = self.kernel.OpenProcess(0x1000, False, pid.value)
@@ -256,24 +289,7 @@ class WindowsGUI:
                 raise ctypes.WinError(ctypes.get_last_error())
         finally:
             self.kernel.CloseHandle(handle)
-        try:
-            self.browser=browser_name(exe.value,self.cfg.get("browser","auto"))
-        except ValueError as error:
-            raise StopRun(str(error)) from error
-        self.initial_geometry = self.geometry()
-        self.bound_identity = self.process_identity()
-        self.bound_environment = self.environment()
-        if not self.bound_environment["monitor"]["primary"]:
-            raise StopRun("TARGET_WINDOW_LOST: Edge muss auf dem Hauptmonitor liegen.")
-        calibrated = self.cfg.get("calibration")
-        if check_calibration and calibrated:
-            if calibrated.get("coordinate_space") != "primary_screen_physical_pixels" or calibrated.get("schema") != 1:
-                raise StopRun("RECALIBRATION_REQUIRED: unbekanntes Kalibrierungsformat.")
-            old = calibrated["target"]
-            if any(old[key] != self.bound_environment[key] for key in ("window_bounds","screen_size","dpi","monitor")):
-                raise StopRun("RECALIBRATION_REQUIRED: Fenster, Monitor oder DPI weichen von der Kalibrierung ab.")
-        self.guard(areas=check_config)
-        print("Gebunden an",self.browser,":", self.title(), flush=True)
+        return exe.value
 
     def process_identity(self):
         pid = W.DWORD()
@@ -315,9 +331,33 @@ class WindowsGUI:
     def activate_target(self, *, cleanup=False):
         if not self.user.IsWindow(self.hwnd) or self.process_identity()!=self.bound_identity:
             raise StopRun("TARGET_WINDOW_LOST: Ziel-Fenster wurde geschlossen/ersetzt.")
+        self.identity_environment_check()
         self.user.SetForegroundWindow(self.hwnd)
         self.pause(.3,check_abort=not cleanup)
         self.guard(areas=False,check_abort=not cleanup)
+
+    def identity_environment_check(self):
+        if not self.user.IsWindow(self.hwnd):
+            raise StopRun("TARGET_WINDOW_LOST: Ziel geschlossen.")
+        if hasattr(self,"bound_identity") and self.process_identity()!=self.bound_identity:
+            raise StopRun("TARGET_WINDOW_LOST: Prozessidentitaet geaendert.")
+        if hasattr(self,"bound_exe") and self.process_executable()!=self.bound_exe:
+            raise StopRun("TARGET_WINDOW_LOST: Executable geaendert.")
+        if hasattr(self,"bound_exe") and (not self.user.IsWindowVisible(self.hwnd) or self.user.IsIconic(self.hwnd)):
+            raise StopRun("TARGET_WINDOW_LOST: Fenster ist nicht mehr sichtbar/bereit.")
+        if hasattr(self,"window_property") and not self.user.GetPropW(self.hwnd,self.window_property):
+            raise StopRun("TARGET_WINDOW_LOST: HWND-Lebensdauer geaendert.")
+        if hasattr(self,"bound_environment") and self.environment()!=self.bound_environment:
+            raise StopRun("RECALIBRATION_REQUIRED: Fenster, DPI oder Monitor geaendert.")
+
+    def __del__(self):
+        # Property dies with HWND; remove our own live marker when this adapter closes.
+        try:
+            if getattr(self,"window_property",None) and self.user.IsWindow(self.hwnd):
+                self.user.RemovePropW.argtypes=[W.HWND,W.LPCWSTR]
+                self.user.RemovePropW(self.hwnd,self.window_property)
+        except Exception:
+            pass
 
     def remove_dom_picker(self):
         # ESC beendet die Auswahl, darf die eigene lokale Bereinigung aber nicht
@@ -330,8 +370,9 @@ class WindowsGUI:
     def guard(self, areas=True, *, check_abort=True):
         if check_abort:
             self.abort_check()
+        self.identity_environment_check()
         if self.user.GetForegroundWindow() != self.hwnd:
-            raise StopRun("Edge hat den Fokus verloren. Keine weiteren Klicks.")
+            raise StopRun("Zielbrowser hat den Fokus verloren. Keine weiteren Klicks.")
         if self.geometry() != self.initial_geometry or self.size != (self.user.GetSystemMetrics(0), self.user.GetSystemMetrics(1)):
             raise StopRun("Fensterposition oder Bildschirmgroesse wurde geaendert.")
         if hasattr(self,"bound_identity") and self.process_identity()!=self.bound_identity:
@@ -376,12 +417,12 @@ class WindowsGUI:
             import uiautomation
             self.auto = uiautomation
         else:
+            from calibration.profiles import decode_template
+            expected=tuple(self.cfg["button_rect"][2:])
             for attr, filename in (("enabled", "button_enabled.png"), ("disabled", "button_disabled.png")):
-                with Image.open(self.config_dir / filename) as im:
-                    setattr(self, attr, im.convert("RGB"))
-            expected = tuple(self.cfg["button_rect"][2:])
-            if self.enabled.size != expected or self.disabled.size != expected:
-                raise ValueError("Button-Vorlagen passen nicht zu button_rect. Neu kalibrieren.")
+                if not hasattr(self,"template_bytes") or filename not in self.template_bytes:
+                    raise StopRun("Button-Template-Snapshot fehlt; Lauf neu vorbereiten.")
+                setattr(self,attr,decode_template(self.template_bytes[filename],expected))
             if difference(self.enabled, self.disabled) < self.cfg["template_margin"] * 2:
                 raise ValueError("Aktive/inaktive Vorlage sind nicht deutlich unterscheidbar.")
 
@@ -549,35 +590,25 @@ def run_capture(gui, cfg, folder, manifest, confirmed_image=None):
 
 
 def build_pdf(folder, manifest, output):
-    """PDF aus dem Manifest, mit Hash-Pruefung und atomarer Fertigstellung."""
-    if manifest.get("schema",1) not in (1,2):
-        raise ValueError("Unbekanntes Aufnahmemanifest-Schema.")
-    if manifest.get("schema")==2 and "regions" not in manifest["config"]:
-        raise ValueError("Schema 2 braucht die geordnete regions-Liste.")
+    """Legacy export API. Schema 3 must use the persisted ExportPlan renderer."""
+    if manifest.get("schema")==3:
+        raise ValueError("Schema 3 erfordert einen gespeicherten ExportPlan.")
+    return _render_pdf(folder,manifest,output)
+
+
+def _render_pdf(folder,manifest,output,selected=None):
+    from calibration.exports import readable_manifest, view_images, pdf_options, validate_page_size
+    readable_manifest(manifest)
+    pdf_options(manifest["config"])
     if not manifest["pairs"]:
         return False
     cfg = manifest["config"]
-    factor = 72.0 / cfg["pdf_dpi"]
     output = Path(output)
     tmp = output.with_suffix(output.suffix + ".tmp")
     pdf = canvas.Canvas(str(tmp), pageCompression=1)
-    pdf.setTitle("Edge Bildschirmaufnahmen")
-    for expected_index, pair in enumerate(manifest["pairs"], 1):
-        images = []
-        expected_names=image_names(cfg,expected_index)
-        if pair["index"] != expected_index or len(pair["images"]) != len(expected_names):
-            raise ValueError("Ungueltiges Bildpaar im Manifest.")
-        for expected_name,rect,entry in zip(expected_names,capture_rects(cfg),pair["images"]):
-            name = entry["file"]
-            if name != expected_name:
-                raise ValueError("Bildnamen/Reihenfolge im Manifest sind ungueltig.")
-            path = folder / name
-            if sha256(path) != entry["sha256"]:
-                raise ValueError(f"Beschaedigtes/geaendertes Zwischenbild: {name}")
-            with Image.open(path) as im:
-                if im.size!=tuple(rect[2:]):
-                    raise ValueError("Bildgroesse passt nicht zur gespeicherten Konfiguration.")
-                images.append(im.convert("RGB"))
+    pdf.setTitle("RectoFlow Capture")
+    for expected_index in (selected if selected is not None else range(1,len(manifest["pairs"])+1)):
+        images=view_images(folder,manifest,expected_index)
         if cfg["pdf_layout"] == "spread":
             joined = Image.new("RGB", (sum(im.width for im in images),max(im.height for im in images)), "white")
             offset=0
@@ -588,19 +619,22 @@ def build_pdf(folder, manifest, output):
         for im in images:
             w, h = im.size
             paper=cfg.get("paper_format","Original")
-            pw,ph=(w*factor,h*factor) if paper=="Original" else tuple(v*72/25.4 for v in PAPER_MM[paper])
+            pw,ph=(w*72.0/cfg["pdf_dpi"],h*72.0/cfg["pdf_dpi"]) if paper=="Original" else tuple(v*72/25.4 for v in PAPER_MM[paper])
             if paper!="Original" and cfg.get("paper_orientation","portrait")=="landscape":
                 pw,ph=ph,pw
+            validate_page_size(pw,ph)
             scale=min(pw/w,ph/h)
             pdf.setPageSize((pw,ph))
             pdf.drawImage(ImageReader(im),(pw-w*scale)/2,(ph-h*scale)/2,width=w*scale,height=h*scale)
             pdf.showPage()
     pdf.save()
+    with tmp.open("r+b") as stream:os.fsync(stream.fileno())
     os.replace(tmp, output)
     return True
 
 
 def main():
+    configure_console()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version",action="version",version=f"RectoFlow {VERSION}")
     parser.add_argument("--config", type=Path, default=config_root()/"config.json")
@@ -612,10 +646,20 @@ def main():
     modes.add_argument("--preview", action="store_true", help="Bereiche pruefen, keine Weiter-Klicks")
     modes.add_argument("--calibrate", nargs="?", const="interactive", choices=["interactive","enabled","disabled"], help="Interaktive Kalibrierung; enabled/disabled: bisherige Button-Bildvorlagen")
     modes.add_argument("--rebuild", type=Path, metavar="RUN_ORDNER", help="PDF ohne Browsersteuerung neu erzeugen")
+    parser.add_argument("--profile",metavar="UUID",help="Gespeichertes Profil verwenden")
+    parser.add_argument("--export-plan",type=Path,help="Gespeicherten ExportPlan bei --rebuild verwenden")
     args = parser.parse_args()
+    if args.export_plan and (not args.rebuild or any((args.paper,args.orientation,args.layout))):
+        parser.error("--export-plan erfordert --rebuild und darf nicht mit Format-Overrides kombiniert werden.")
     if args.rebuild:
         folder = args.rebuild.resolve()
-        manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
+        from calibration.exports import source_snapshot, create_plan, execute_plan
+        manifest,manifest_hash=source_snapshot(folder)
+        overrides={key:value for key,value in (("paper_format",args.paper),("paper_orientation",args.orientation),("pdf_layout",args.layout)) if value is not None}
+        if manifest.get("schema")==3 or args.export_plan:
+            plan=args.export_plan or create_plan(folder,options=overrides,expected_manifest_hash=manifest_hash)
+            print(execute_plan(folder,plan))
+            return 0
         import copy
         manifest=copy.deepcopy(manifest)
         for key,value in (("paper_format",args.paper),("paper_orientation",args.orientation),("pdf_layout",args.layout)):
@@ -631,10 +675,22 @@ def main():
         return 0
     if any((args.paper,args.orientation,args.layout)):
         parser.error("--paper/--orientation/--layout sind fuer --rebuild. Aufnahmeauswahl in --calibrate aendern.")
-    config_path = args.config.resolve()
-    config_bytes = config_path.read_bytes()
-    cfg = json.loads(config_bytes.decode("utf-8-sig"))
+    profile_snapshot=None
+    if args.profile:
+        from calibration.profiles import ProfileStore
+        profile_snapshot=ProfileStore(config_root()/"data").snapshot(args.profile,include_templates=not bool(args.calibrate))
+        config_path=profile_snapshot["config_path"]
+        config_bytes=profile_snapshot["config_bytes"]
+        cfg=profile_snapshot["config"]
+    else:
+        from calibration.storage import config_transaction
+        config_path = args.config.resolve()
+        with config_transaction(config_path):
+            config_bytes = config_path.read_bytes()
+            cfg = json.loads(config_bytes.decode("utf-8-sig"))
+            template_bytes={name:(config_path.parent/name).read_bytes() for name in ("button_enabled.png","button_disabled.png")} if not args.calibrate and cfg["button_mode"]=="template" and navigation(cfg)=="next_button" else {}
     gui = WindowsGUI(cfg, config_path.parent)
+    gui.template_bytes={"button_"+key+".png":data for key,data in profile_snapshot["templates"].items()} if profile_snapshot else template_bytes
     if args.calibrate == "interactive":
         from calibration.calibration import calibrate
         return calibrate(gui,cfg,config_path,hashlib.sha256(config_bytes).hexdigest(),validate)
@@ -646,19 +702,18 @@ def main():
             print(f"x={p.x:5d} y={p.y:5d}", end="\r", flush=True)
             gui.pause(0.15)
     validate(cfg, gui.size)
-    print(f"{cfg['start_delay']} Sekunden: Edge und Startseite in den Vordergrund bringen.", flush=True)
-    gui.pause(cfg["start_delay"])
     gui.bind()
     gui.park()
     gui.pause(0.5)
     if args.calibrate in ("enabled","disabled"):
-        path = config_path.parent / f"button_{args.calibrate}.png"
-        if path.exists():
-            raise ValueError(f"Vorlage existiert bereits: {path}. Fuer Neukalibrierung manuell umbenennen.")
-        gui.snapshot().crop(box(cfg["button_rect"])).save(path)
+        from io import BytesIO
+        from calibration.config_io import record_template
+        data=BytesIO()
+        gui.snapshot().crop(box(cfg["button_rect"])).save(data,format="PNG")
+        path=record_template(config_path,args.calibrate,data.getvalue(),hashlib.sha256(config_bytes).hexdigest())
         print("Vorlage gespeichert:", path)
         return 0
-    output_root = (config_path.parent / cfg["output_dir"]).resolve()
+    output_root = profile_snapshot["output_root"] if profile_snapshot else (config_path.parent / cfg["output_dir"]).resolve()
     folder = output_root / ("run_" + datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:8])
     folder.mkdir(parents=True, exist_ok=False)
     if args.preview:
@@ -685,50 +740,44 @@ def main():
     if "regions" in cfg or cfg.get("calibration",{}).get("requires_visual_confirmation"):
         from calibration.calibration import confirm_capture
         confirmed_image=confirm_capture(gui,cfg)
-    manifest = {"schema": 2 if "regions" in cfg else 1, "version":VERSION,"status": "RUNNING", "reason": "", "pairs": [], "config": cfg,
+    manifest = {"schema": 3, "version":VERSION,"status": "RUNNING", "reason": "", "pairs": [], "config": cfg,
                 "script_sha256": sha256(Path(__file__)), "started": datetime.now().astimezone().isoformat(),
                 "window_title": gui.title(), "screen_size": gui.size,
                 "python": sys.version, "platform": platform.platform(),
                 "dependencies": {name: importlib.metadata.version(name) for name in ("Pillow", "reportlab", "uiautomation")},
-                "config_sha256": hashlib.sha256(config_bytes).hexdigest(),"code_tree":code_identity()}
+                "config_sha256": hashlib.sha256(config_bytes).hexdigest(),"code_tree":code_identity(),
+                "profile":profile_snapshot["profile"] if profile_snapshot else None}
     if cfg["button_mode"] == "template":
-        manifest["template_sha256"] = {name: sha256(config_path.parent / name)
-                                      for name in ("button_enabled.png", "button_disabled.png")}
-    write_json(folder / "manifest.json", manifest)
+        manifest["template_sha256"] = {name:hashlib.sha256(data).hexdigest() for name,data in gui.template_bytes.items()}
+    from calibration.storage import exclusive
+    from calibration.exports import source_snapshot, create_plan, execute_plan
     exit_code = 2
-    try:
-        gui.prepare_button()
-        run_capture(gui, cfg, folder, manifest,confirmed_image=confirmed_image)
-        manifest["status"] = "COMPLETE"
-        exit_code = 0
-    except (Exception, KeyboardInterrupt) as error:
-        manifest["status"] = "STOPPED"
-        manifest["reason"] = f"{type(error).__name__}: {error}"
-        print("ABBRUCH:", manifest["reason"], flush=True)
-    finally:
-        manifest["finished"] = datetime.now().astimezone().isoformat()
+    with exclusive(folder/".writer.lock"):
         write_json(folder / "manifest.json", manifest)
-        filename = "gesamt.pdf" if manifest["status"] == "COMPLETE" else "gesamt_TEILSTAND.pdf"
         try:
-            if manifest["status"]=="COMPLETE" and cfg.get("confirm_pdf_export",False):
-                from calibration.pdf_export import export_dialog
-                exported=export_dialog(folder,manifest,build_pdf)
-                if exported is not None:
-                    manifest["pdf"]=exported
-                    print("PDF:",folder/exported["file"])
-                else:
-                    manifest["pdf_export_status"]="DEFERRED"
-                    print("PDF-Export aufgeschoben; PNGs/Manifest bleiben erhalten.")
-            elif build_pdf(folder, manifest, folder / filename):
-                manifest["pdf"] = {"file": filename, "sha256": sha256(folder / filename)}
-                print("PDF:", folder / filename)
+            gui.prepare_button()
+            run_capture(gui,cfg,folder,manifest,confirmed_image=confirmed_image)
+            manifest["status"]="COMPLETE";exit_code=0
         except (Exception, KeyboardInterrupt) as error:
-            manifest["status"] = "PDF_FAILED"
-            manifest["pdf_error"] = f"{type(error).__name__}: {error}"
-            exit_code = 2
-            print("PDF fehlgeschlagen; PNGs/Manifest bleiben erhalten:", error)
-        write_json(folder / "manifest.json", manifest)
-        print("Status:", manifest["status"], "; Ordner:", folder, flush=True)
+            manifest["status"]="STOPPED";manifest["reason"]=f"{type(error).__name__}: {error}"
+            print("ABBRUCH:",manifest["reason"],flush=True)
+        finally:
+            manifest["finished"]=datetime.now().astimezone().isoformat()
+            write_json(folder/"manifest.json",manifest)
+    frozen,manifest_hash=source_snapshot(folder)  # capture manifest is now frozen
+    try:
+        if frozen["pairs"]:
+            if cfg.get("confirm_pdf_export",False):
+                from calibration.pdf_export import export_dialog
+                exported=export_dialog(folder,frozen,build_pdf)
+                if exported:print("PDF:",folder/exported["file"])
+                else:print("Export aufgeschoben; Originalaufnahmen bleiben erhalten.")
+            else:
+                plan=create_plan(folder,expected_manifest_hash=manifest_hash)
+                print("PDF:",execute_plan(folder,plan))
+    except (Exception,KeyboardInterrupt) as error:
+        exit_code=2;print("PDF fehlgeschlagen; Capture bleibt eingefroren:",error,flush=True)
+    print("Status:",frozen["status"],"; Ordner:",folder,flush=True)
     return exit_code
 
 

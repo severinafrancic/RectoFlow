@@ -2,6 +2,8 @@
 (() => {
   'use strict';
   const token = '__SESSION_TOKEN__';
+  const created = __SESSION_STARTED__;
+  if (Date.now() < created || Date.now()-created > 180000) throw new Error('Picker-Sitzung abgelaufen.');
   const key = '__edgeCaptureLocalPicker';
   if (window !== window.top) throw new Error('DOM_PICKER_FAILED: Top-Frame der Seite auswaehlen.');
   if (window[key]) window[key].cleanup();
@@ -21,7 +23,7 @@
   const cancel = document.createElement('button');
   cancel.textContent = 'Abbrechen / entfernen';
   const copyButton = document.createElement('button');
-  copyButton.textContent = 'Ergebnis kopieren';
+  copyButton.textContent = 'Ergebnisdatei speichern';
   copyButton.hidden = true;
   const textarea = document.createElement('textarea');
   textarea.hidden = true;
@@ -93,18 +95,20 @@
       marker.style.cssText = `position:fixed;left:${p[0]}px;top:${p[1]}px;width:24px;height:24px;border:2px solid black;box-sizing:border-box;background:rgb(${colors[i].join(',')});pointer-events:none;`;
       shadow.append(marker); markers.push(marker);
     });
-    const result = {schema:1,token,created_ms:Date.now(),dpr:devicePixelRatio,
+    const result = {schema:1,token,created_ms:created,dpr:devicePixelRatio,
       viewport:[innerWidth,innerHeight],scroll:[scrollX,scrollY],visual_scale:visualViewport?.scale || 1,
       markers:positions.map((p,i)=>({css_center:[p[0]+12,p[1]+12],color:colors[i]})),rects:chosen};
     textarea.value = JSON.stringify(result); textarea.hidden = false;
-    line.textContent = 'Ergebnis kopieren. DevTools schliessen (ohne Layoutwechsel), danach zur Kalibrierung zurueck. ESC entfernt jetzt alles.';
+    line.textContent = 'Ergebnisdatei speichern und in RectoFlow importieren. F8 entfernt jetzt alles.';
   }
   on(skip,'click', e => {e.stopImmediatePropagation(); next();});
   on(cancel,'click', e => {e.stopImmediatePropagation(); cleanup();});
-  on(copyButton,'click', async e => {
+  on(copyButton,'click', e => {
     e.stopImmediatePropagation();
-    try {await navigator.clipboard.writeText(textarea.value); copyButton.textContent='Kopiert';}
-    catch (_) {textarea.focus();textarea.select();document.execCommand('copy');copyButton.textContent='Auswahl mit Strg+C kopieren';}
+    const url=URL.createObjectURL(new Blob([textarea.value],{type:'application/json'}));
+    const link=document.createElement('a'); link.href=url;link.download=`result.${token}.json`;
+    link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+    copyButton.textContent='Datei gespeichert / erneut speichern';
   });
   on(document,'keydown', e => {
     if (e.key === 'F8') {e.preventDefault();e.stopImmediatePropagation();cleanup();return;}
@@ -142,6 +146,6 @@
   panel.style.zIndex='3';
   highlight.style.zIndex='2';
   beacon.style.zIndex='4';
-  timeout = setTimeout(cleanup, 180000);
+  timeout = setTimeout(cleanup, Math.max(0,180000-(Date.now()-created)));
   update();
 })();
