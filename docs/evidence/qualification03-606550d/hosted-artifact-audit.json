@@ -1,0 +1,58 @@
+{
+  "run": 37670215300,
+  "subject_sha": "606550d2541f7b00554786c721a291d1df14070c",
+  "status": "success",
+  "artifacts": [
+    {
+      "id": 11504721549,
+      "name": "spike03-3.12",
+      "bytes": 85414465,
+      "sha256": "b4deff1d9882fd1d5913b4b18b178f90642ade51b06ca41bb850d71cf155e990",
+      "reports": {
+        "source/report.json": {
+          "bytes": 31059,
+          "sha256": "b214daa0ae574db5a44ae5e4703c2601c2c2768040f5dad7e9cc1926f60b17a9"
+        },
+        "frozen/report.json": {
+          "bytes": 31054,
+          "sha256": "19db1ffed77f8dde790698aa9fb90a303433924ad32f93ed16d560029b79e1f6"
+        },
+        "prepared/wheel-inventory.json": {
+          "bytes": 21705,
+          "sha256": "81daa659a7999b7ee153a37931c74e1e431fa2773555faded0da447dd6ab4840"
+        },
+        "bundle/build-summary.json": {
+          "bytes": 408,
+          "sha256": "9a50df16e3f5239f6a126789318c3e0185dd39611d0ba44dcdece9b3fbbbdcfd"
+        },
+        "bundle/dist/RectoFlowSpike03/SPIKE_BUILD_METADATA.json": {
+          "bytes": 286719,
+          "sha256": "a648b4f5b19e0c1fae72e1e71dcb1702797cb5642da05e84d3ee4aa934652936"
+        }
+      },
+      "bundle_all_members_hash_verified": true,
+      "bundle_source_subject_verified": true
+    },
+    {
+      "id": 11504009766,
+      "name": "spike03-3.11",
+      "bytes": 9903,
+      "sha256": "55e5e7ede12457e0366a402c8049afbe12d8d2ca5242692016910005926fa0f8",
+      "reports": {
+        "source/report.json": {
+          "bytes": 31037,
+          "sha256": "2a826862fa1e1b666aec6f6cd787fedb358ff76af565d7d73dff319baf54d0f5"
+        },
+        "prepared/wheel-inventory.json": {
+          "bytes": 21705,
+          "sha256": "e82414b01778373c20455799182be2f151deb49871688556336074c6bf53eb48"
+        }
+      }
+    }
+  ],
+  "logs_sha256": "cb1887ebff9ee20fe051bd284c63f0ddd085c0f131f5013ca8d8ae3317d051db",
+  "run_metadata_sha256": "d41006aa10bc4263c261d5fe3c4c2f414bfd65c207f6beb5b3c6df8dabe440e3",
+  "jobs_metadata_sha256": "29483b180cf1caed8631531080ac89350056d36f51ec4654ad05c501332d2ac0",
+  "artifact_metadata_sha256": "cd6878da7b14c932540e83669fa7c82ef71203783d91bd8a5a95184411bf249d",
+  "regression_129_runs": 2
+}

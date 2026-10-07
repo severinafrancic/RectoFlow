@@ -1,0 +1,1056 @@
+{
+  "schema": 1,
+  "producer": "BUILDER",
+  "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "environment": "SOURCE_LOCAL_OR_CI",
+  "tests": [
+    {
+      "case": "providers",
+      "status": "PASS",
+      "pid": 1072,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 0.30821060000016587,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 266661888,
+      "job_peak_committed_bytes": 268722176,
+      "launcher_peak_working_set_bytes": 4378624,
+      "response": {
+        "providers": {
+          "pypdfium2": "5.14.0",
+          "opencv-python-headless": "5.0.0.93",
+          "numpy": "2.4.6",
+          "Pillow": "12.3.0",
+          "pyinstaller": "6.22.3",
+          "pdfium": "156.0.8076.0",
+          "pdfium_flags": [],
+          "opencv": "5.0.0"
+        },
+        "in_job": true,
+        "worker_memory": {
+          "pid": 1344,
+          "peak_working_set_bytes": 47353856,
+          "peak_committed_bytes": 266661888
+        }
+      },
+      "peak_working_set_bytes": 47353856
+    },
+    {
+      "case": "pdf_bound_bytes_geometry",
+      "status": "PASS",
+      "pid": 21788,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 0.3580608000011125,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 270430208,
+      "job_peak_committed_bytes": 272510976,
+      "launcher_peak_working_set_bytes": 4382720,
+      "response": {
+        "pages": [
+          {
+            "index": 0,
+            "bbox": [
+              20.0,
+              30.0,
+              280.0,
+              370.0
+            ],
+            "size_px": [
+              340.0,
+              260.0
+            ],
+            "rotation": 90,
+            "raster_sha256": "79e93a631741e1c1e5df57b760aa1fd8e13f5c5c610ecc718e18fbc357abb582",
+            "raster_bytes": 4298,
+            "container_proposal": {
+              "origin": "CONTAINER_PAGE",
+              "kind": "FULL_FRAME",
+              "source_id": "fixture",
+              "frame_id": "pdf-0",
+              "raster_sha256": "79e93a631741e1c1e5df57b760aa1fd8e13f5c5c610ecc718e18fbc357abb582",
+              "size": [
+                340,
+                260
+              ],
+              "quad": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  339,
+                  0
+                ],
+                [
+                  339,
+                  259
+                ],
+                [
+                  0,
+                  259
+                ]
+              ],
+              "acceptance": "REVIEW_REQUIRED"
+            }
+          },
+          {
+            "index": 1,
+            "bbox": [
+              10.0,
+              20.0,
+              290.0,
+              380.0
+            ],
+            "size_px": [
+              280.0,
+              360.0
+            ],
+            "rotation": 0,
+            "raster_sha256": "f2137e280d06cffdcc60a0b76a3ee2d814493a119d3befcdb304514f9cac0f97",
+            "raster_bytes": 4003,
+            "container_proposal": {
+              "origin": "CONTAINER_PAGE",
+              "kind": "FULL_FRAME",
+              "source_id": "fixture",
+              "frame_id": "pdf-1",
+              "raster_sha256": "f2137e280d06cffdcc60a0b76a3ee2d814493a119d3befcdb304514f9cac0f97",
+              "size": [
+                280,
+                360
+              ],
+              "quad": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  279,
+                  0
+                ],
+                [
+                  279,
+                  359
+                ],
+                [
+                  0,
+                  359
+                ]
+              ],
+              "acceptance": "REVIEW_REQUIRED"
+            }
+          },
+          {
+            "index": 2,
+            "bbox": [
+              0.0,
+              0.0,
+              400.0,
+              200.0
+            ],
+            "size_px": [
+              400.0,
+              200.0
+            ],
+            "rotation": 0,
+            "raster_sha256": "fb7868a448a8a221894f034ae797c19c15201cbdef58c53655061ab5cad08cef",
+            "raster_bytes": 3601,
+            "container_proposal": {
+              "origin": "CONTAINER_PAGE",
+              "kind": "FULL_FRAME",
+              "source_id": "fixture",
+              "frame_id": "pdf-2",
+              "raster_sha256": "fb7868a448a8a221894f034ae797c19c15201cbdef58c53655061ab5cad08cef",
+              "size": [
+                400,
+                200
+              ],
+              "quad": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  399,
+                  0
+                ],
+                [
+                  399,
+                  199
+                ],
+                [
+                  0,
+                  199
+                ]
+              ],
+              "acceptance": "REVIEW_REQUIRED"
+            }
+          },
+          {
+            "index": 3,
+            "bbox": [
+              0.0,
+              0.0,
+              200.0,
+              300.0
+            ],
+            "size_px": [
+              200.0,
+              300.0
+            ],
+            "rotation": 180,
+            "raster_sha256": "ecb727141f7f0106ad75c380c6d2b24f4498f83c615f3c538183fe9d70c63fa0",
+            "raster_bytes": 2899,
+            "container_proposal": {
+              "origin": "CONTAINER_PAGE",
+              "kind": "FULL_FRAME",
+              "source_id": "fixture",
+              "frame_id": "pdf-3",
+              "raster_sha256": "ecb727141f7f0106ad75c380c6d2b24f4498f83c615f3c538183fe9d70c63fa0",
+              "size": [
+                200,
+                300
+              ],
+              "quad": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  199,
+                  0
+                ],
+                [
+                  199,
+                  299
+                ],
+                [
+                  0,
+                  299
+                ]
+              ],
+              "acceptance": "REVIEW_REQUIRED"
+            }
+          }
+        ],
+        "source_sha256": "5aeb0bffb8266edf45d8312b0306730c7735aa4d8fb04cd832427ab1127f35a7",
+        "resources_closed": true,
+        "userunit_policy": "scale in PDF canvas units; /UserUnit=2 does not become physical-DPI certification",
+        "worker_memory": {
+          "pid": 21420,
+          "peak_working_set_bytes": 52711424,
+          "peak_committed_bytes": 270430208
+        }
+      },
+      "peak_working_set_bytes": 52711424
+    },
+    {
+      "case": "pdf_password_private_pipe",
+      "status": "PASS",
+      "pid": 25312,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 0.30404730000009295,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 271581184,
+      "job_peak_committed_bytes": 273657856,
+      "launcher_peak_working_set_bytes": 4382720,
+      "response": {
+        "pages": [
+          {
+            "index": 0,
+            "bbox": [
+              20.0,
+              30.0,
+              280.0,
+              370.0
+            ],
+            "size_px": [
+              340.0,
+              260.0
+            ],
+            "rotation": 90,
+            "raster_sha256": "79e93a631741e1c1e5df57b760aa1fd8e13f5c5c610ecc718e18fbc357abb582",
+            "raster_bytes": 4298,
+            "container_proposal": {
+              "origin": "CONTAINER_PAGE",
+              "kind": "FULL_FRAME",
+              "source_id": "fixture",
+              "frame_id": "pdf-0",
+              "raster_sha256": "79e93a631741e1c1e5df57b760aa1fd8e13f5c5c610ecc718e18fbc357abb582",
+              "size": [
+                340,
+                260
+              ],
+              "quad": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  339,
+                  0
+                ],
+                [
+                  339,
+                  259
+                ],
+                [
+                  0,
+                  259
+                ]
+              ],
+              "acceptance": "REVIEW_REQUIRED"
+            }
+          },
+          {
+            "index": 1,
+            "bbox": [
+              10.0,
+              20.0,
+              290.0,
+              380.0
+            ],
+            "size_px": [
+              280.0,
+              360.0
+            ],
+            "rotation": 0,
+            "raster_sha256": "f2137e280d06cffdcc60a0b76a3ee2d814493a119d3befcdb304514f9cac0f97",
+            "raster_bytes": 4003,
+            "container_proposal": {
+              "origin": "CONTAINER_PAGE",
+              "kind": "FULL_FRAME",
+              "source_id": "fixture",
+              "frame_id": "pdf-1",
+              "raster_sha256": "f2137e280d06cffdcc60a0b76a3ee2d814493a119d3befcdb304514f9cac0f97",
+              "size": [
+                280,
+                360
+              ],
+              "quad": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  279,
+                  0
+                ],
+                [
+                  279,
+                  359
+                ],
+                [
+                  0,
+                  359
+                ]
+              ],
+              "acceptance": "REVIEW_REQUIRED"
+            }
+          },
+          {
+            "index": 2,
+            "bbox": [
+              0.0,
+              0.0,
+              400.0,
+              200.0
+            ],
+            "size_px": [
+              400.0,
+              200.0
+            ],
+            "rotation": 0,
+            "raster_sha256": "fb7868a448a8a221894f034ae797c19c15201cbdef58c53655061ab5cad08cef",
+            "raster_bytes": 3601,
+            "container_proposal": {
+              "origin": "CONTAINER_PAGE",
+              "kind": "FULL_FRAME",
+              "source_id": "fixture",
+              "frame_id": "pdf-2",
+              "raster_sha256": "fb7868a448a8a221894f034ae797c19c15201cbdef58c53655061ab5cad08cef",
+              "size": [
+                400,
+                200
+              ],
+              "quad": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  399,
+                  0
+                ],
+                [
+                  399,
+                  199
+                ],
+                [
+                  0,
+                  199
+                ]
+              ],
+              "acceptance": "REVIEW_REQUIRED"
+            }
+          },
+          {
+            "index": 3,
+            "bbox": [
+              0.0,
+              0.0,
+              200.0,
+              300.0
+            ],
+            "size_px": [
+              200.0,
+              300.0
+            ],
+            "rotation": 180,
+            "raster_sha256": "ecb727141f7f0106ad75c380c6d2b24f4498f83c615f3c538183fe9d70c63fa0",
+            "raster_bytes": 2899,
+            "container_proposal": {
+              "origin": "CONTAINER_PAGE",
+              "kind": "FULL_FRAME",
+              "source_id": "fixture",
+              "frame_id": "pdf-3",
+              "raster_sha256": "ecb727141f7f0106ad75c380c6d2b24f4498f83c615f3c538183fe9d70c63fa0",
+              "size": [
+                200,
+                300
+              ],
+              "quad": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  199,
+                  0
+                ],
+                [
+                  199,
+                  299
+                ],
+                [
+                  0,
+                  299
+                ]
+              ],
+              "acceptance": "REVIEW_REQUIRED"
+            }
+          }
+        ],
+        "source_sha256": "8a9effdf530880abccda03d880a41662c7a05c3d731e0e0f9deac35e1cd46a1c",
+        "resources_closed": true,
+        "userunit_policy": "scale in PDF canvas units; /UserUnit=2 does not become physical-DPI certification",
+        "worker_memory": {
+          "pid": 22524,
+          "peak_working_set_bytes": 53415936,
+          "peak_committed_bytes": 271581184
+        }
+      },
+      "peak_working_set_bytes": 53415936
+    },
+    {
+      "case": "pdf_wrong_password",
+      "status": "PASS",
+      "pid": 12248,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 0.285050800001045,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 267325440,
+      "job_peak_committed_bytes": 269414400,
+      "launcher_peak_working_set_bytes": 4386816,
+      "response": {
+        "refused": true,
+        "error_code": 4,
+        "error_class": "PdfiumError",
+        "worker_memory": {
+          "pid": 11380,
+          "peak_working_set_bytes": 48058368,
+          "peak_committed_bytes": 267325440
+        }
+      },
+      "peak_working_set_bytes": 48058368
+    },
+    {
+      "case": "pdf_corrupt",
+      "status": "PASS",
+      "pid": 4304,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 0.30890329999965616,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 267890688,
+      "job_peak_committed_bytes": 269963264,
+      "launcher_peak_working_set_bytes": 4386816,
+      "response": {
+        "refused": true,
+        "error_code": 3,
+        "error_class": "PdfiumError",
+        "worker_memory": {
+          "pid": 23824,
+          "peak_working_set_bytes": 48168960,
+          "peak_committed_bytes": 267890688
+        }
+      },
+      "peak_working_set_bytes": 48168960
+    },
+    {
+      "case": "tiff_frames_container_policy",
+      "status": "PASS",
+      "pid": 14428,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 0.35200740000072983,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 271450112,
+      "job_peak_committed_bytes": 273526784,
+      "launcher_peak_working_set_bytes": 4382720,
+      "response": {
+        "frames": [
+          {
+            "index": 0,
+            "size": [
+              128,
+              96
+            ],
+            "sha256": "daaa959b20cfc72e3491c6a032bb9d90b287c049757826039f8a1f5970e757fe",
+            "container_proposal": {
+              "origin": "CONTAINER_PAGE",
+              "kind": "FULL_FRAME",
+              "source_id": "fixture",
+              "frame_id": "tiff-0",
+              "raster_sha256": "daaa959b20cfc72e3491c6a032bb9d90b287c049757826039f8a1f5970e757fe",
+              "size": [
+                128,
+                96
+              ],
+              "quad": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  127,
+                  0
+                ],
+                [
+                  127,
+                  95
+                ],
+                [
+                  0,
+                  95
+                ]
+              ],
+              "acceptance": "REVIEW_REQUIRED"
+            }
+          },
+          {
+            "index": 1,
+            "size": [
+              96,
+              128
+            ],
+            "sha256": "3e3b0aaf45e4bfa9586f72737b8c46b2070a21c63de70ea6e64d5c6f7f398a2e",
+            "container_proposal": {
+              "origin": "CONTAINER_PAGE",
+              "kind": "FULL_FRAME",
+              "source_id": "fixture",
+              "frame_id": "tiff-1",
+              "raster_sha256": "3e3b0aaf45e4bfa9586f72737b8c46b2070a21c63de70ea6e64d5c6f7f398a2e",
+              "size": [
+                96,
+                128
+              ],
+              "quad": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  95,
+                  0
+                ],
+                [
+                  95,
+                  127
+                ],
+                [
+                  0,
+                  127
+                ]
+              ],
+              "acceptance": "REVIEW_REQUIRED"
+            }
+          },
+          {
+            "index": 2,
+            "size": [
+              160,
+              96
+            ],
+            "sha256": "769f78ead20342f762bbb7d97594affb8d435a3d97c8e0a0bd14872fdc28db2d",
+            "container_proposal": {
+              "origin": "CONTAINER_PAGE",
+              "kind": "FULL_FRAME",
+              "source_id": "fixture",
+              "frame_id": "tiff-2",
+              "raster_sha256": "769f78ead20342f762bbb7d97594affb8d435a3d97c8e0a0bd14872fdc28db2d",
+              "size": [
+                160,
+                96
+              ],
+              "quad": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  159,
+                  0
+                ],
+                [
+                  159,
+                  95
+                ],
+                [
+                  0,
+                  95
+                ]
+              ],
+              "acceptance": "REVIEW_REQUIRED"
+            }
+          }
+        ],
+        "source_sha256": "2068e1c93aafd6a00db445aee1ac58d5386f896df1d45ae67c45cf4ba3bcc4c3",
+        "worker_memory": {
+          "pid": 19164,
+          "peak_working_set_bytes": 51896320,
+          "peak_committed_bytes": 271450112
+        }
+      },
+      "peak_working_set_bytes": 51896320
+    },
+    {
+      "case": "image_corrupt",
+      "status": "PASS",
+      "pid": 19788,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 0.3314957000002323,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 270274560,
+      "job_peak_committed_bytes": 272449536,
+      "launcher_peak_working_set_bytes": 4452352,
+      "response": {
+        "refused": true,
+        "error_class": "UnidentifiedImageError",
+        "worker_memory": {
+          "pid": 6368,
+          "peak_working_set_bytes": 51089408,
+          "peak_committed_bytes": 270274560
+        }
+      },
+      "peak_working_set_bytes": 51089408
+    },
+    {
+      "case": "image_giant_preflight",
+      "status": "PASS",
+      "pid": 2640,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 0.305077999997593,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 267624448,
+      "job_peak_committed_bytes": 269697024,
+      "launcher_peak_working_set_bytes": 4382720,
+      "response": {
+        "refused_before_load": true,
+        "size_px": [
+          13000,
+          6000
+        ],
+        "scope": "spike preflight policy probe",
+        "worker_memory": {
+          "pid": 25024,
+          "peak_working_set_bytes": 48656384,
+          "peak_committed_bytes": 267624448
+        }
+      },
+      "peak_working_set_bytes": 48656384
+    },
+    {
+      "case": "pdf_page_count_preflight",
+      "status": "PASS",
+      "pid": 2928,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 0.29536259999804315,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 267554816,
+      "job_peak_committed_bytes": 269643776,
+      "launcher_peak_working_set_bytes": 4382720,
+      "response": {
+        "refused_before_render": true,
+        "pages": 501,
+        "scope": "spike preflight policy probe",
+        "worker_memory": {
+          "pid": 25512,
+          "peak_working_set_bytes": 48173056,
+          "peak_committed_bytes": 267554816
+        }
+      },
+      "peak_working_set_bytes": 48173056
+    },
+    {
+      "case": "pdf_giant_geometry_preflight",
+      "status": "PASS",
+      "pid": 24616,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 0.2814452999991772,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 267378688,
+      "job_peak_committed_bytes": 269443072,
+      "launcher_peak_working_set_bytes": 4382720,
+      "response": {
+        "refused_before_render": true,
+        "size_px_at_scale1": [
+          30000.0,
+          20000.0
+        ],
+        "scope": "spike preflight policy probe",
+        "worker_memory": {
+          "pid": 25496,
+          "peak_working_set_bytes": 47919104,
+          "peak_committed_bytes": 267378688
+        }
+      },
+      "peak_working_set_bytes": 47919104
+    },
+    {
+      "case": "partial_write_not_published",
+      "status": "PASS",
+      "pid": 3076,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 0.2982606000005035,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 267677696,
+      "job_peak_committed_bytes": 269762560,
+      "launcher_peak_working_set_bytes": 4378624,
+      "response": {
+        "final_not_published": true,
+        "partial_bytes": 30,
+        "scope": "fault injection; not proof of a real full disk or power loss",
+        "worker_memory": {
+          "pid": 8316,
+          "peak_working_set_bytes": 48009216,
+          "peak_committed_bytes": 267677696
+        }
+      },
+      "peak_working_set_bytes": 48009216
+    },
+    {
+      "case": "perspective_deskew_goldens",
+      "status": "PASS",
+      "pid": 1076,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 0.5943571999996493,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 292487168,
+      "job_peak_committed_bytes": 294572032,
+      "launcher_peak_working_set_bytes": 4386816,
+      "response": {
+        "corner_error_px": 6.772006051628324e-14,
+        "pixel_mae": 3.6420605182647705,
+        "output_size": [
+          480,
+          640
+        ],
+        "homography": [
+          [
+            1.0093620981545617,
+            0.05243439470932788,
+            -84.94371942911117
+          ],
+          [
+            0.083429515175686,
+            1.0428689396960764,
+            -90.103876389741
+          ],
+          [
+            6.469725896730412e-05,
+            0.00029277039679599946,
+            1.0
+          ]
+        ],
+        "deskew_ground_truth_deg": 7,
+        "estimated_correction_deg": -6.899998029041285,
+        "residual_deg": 2.5044781608585254e-06,
+        "worker_memory": {
+          "pid": 11412,
+          "peak_working_set_bytes": 74694656,
+          "peak_committed_bytes": 292487168
+        }
+      },
+      "peak_working_set_bytes": 74694656
+    },
+    {
+      "case": "job_memory_limit",
+      "status": "PASS",
+      "pid": 23256,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 0.13068240000211517,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 130097152,
+      "job_peak_committed_bytes": 132182016,
+      "launcher_peak_working_set_bytes": 4382720,
+      "response": {
+        "memory_limit_triggered": true,
+        "allocated_bytes": 117440512,
+        "worker_memory": {
+          "pid": 21616,
+          "peak_working_set_bytes": 138493952,
+          "peak_committed_bytes": 130097152
+        }
+      },
+      "peak_working_set_bytes": 138493952
+    },
+    {
+      "case": "job_timeout",
+      "status": "PASS",
+      "pid": 4940,
+      "exit_code": 92,
+      "termination": "TIMEOUT",
+      "elapsed_seconds": 0.5328670000017155,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 12148736,
+      "job_peak_committed_bytes": 14221312,
+      "launcher_peak_working_set_bytes": 4386816,
+      "response": null
+    },
+    {
+      "case": "job_cancel",
+      "status": "PASS",
+      "pid": 21508,
+      "exit_code": 92,
+      "termination": "CANCELLED",
+      "elapsed_seconds": 0.504782799998793,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 12443648,
+      "job_peak_committed_bytes": 14528512,
+      "launcher_peak_working_set_bytes": 4395008,
+      "response": null
+    },
+    {
+      "case": "worker_crash_contained",
+      "status": "PASS",
+      "pid": 10060,
+      "exit_code": 17,
+      "termination": null,
+      "elapsed_seconds": 0.08912179999970249,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 12431360,
+      "job_peak_committed_bytes": 14585856,
+      "launcher_peak_working_set_bytes": 4444160,
+      "response": null
+    },
+    {
+      "case": "job_parent_death",
+      "status": "PASS",
+      "own_child_pid": 8592
+    },
+    {
+      "case": "resource_1MP",
+      "status": "PASS",
+      "pid": 21784,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 0.40171270000064396,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 291364864,
+      "job_peak_committed_bytes": 293437440,
+      "launcher_peak_working_set_bytes": 4382720,
+      "response": {
+        "megapixels_requested": 1,
+        "size_px": [
+          1154,
+          866
+        ],
+        "decoded_pixels": 999364,
+        "output_bytes": 3163960,
+        "sha256": "ddf2a463c0bf61d37cc4c08255991632fef64b1dff92dfa71421611a7597afe1",
+        "same_bytes_decode_pixel_exact": true,
+        "provider_seconds": 0.10996940000040922,
+        "worker_memory": {
+          "pid": 14732,
+          "peak_working_set_bytes": 73568256,
+          "peak_committed_bytes": 291364864
+        }
+      },
+      "peak_working_set_bytes": 73568256
+    },
+    {
+      "case": "resource_12MP",
+      "status": "PASS",
+      "pid": 18420,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 1.4029885000018112,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 514580480,
+      "job_peak_committed_bytes": 516673536,
+      "launcher_peak_working_set_bytes": 4382720,
+      "response": {
+        "megapixels_requested": 12,
+        "size_px": [
+          4000,
+          3000
+        ],
+        "decoded_pixels": 12000000,
+        "output_bytes": 37981629,
+        "sha256": "43b5b7581673f6dded741be0cd948100565856281b7c47722e961f84b1def2db",
+        "same_bytes_decode_pixel_exact": true,
+        "provider_seconds": 1.0844042999997328,
+        "worker_memory": {
+          "pid": 25184,
+          "peak_working_set_bytes": 296316928,
+          "peak_committed_bytes": 514580480
+        }
+      },
+      "peak_working_set_bytes": 296316928
+    },
+    {
+      "case": "resource_24MP",
+      "status": "PASS",
+      "pid": 6664,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 2.475805100002617,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 756617216,
+      "job_peak_committed_bytes": 758685696,
+      "launcher_peak_working_set_bytes": 4616192,
+      "response": {
+        "megapixels_requested": 24,
+        "size_px": [
+          5656,
+          4243
+        ],
+        "decoded_pixels": 23998408,
+        "output_bytes": 75955360,
+        "sha256": "0b387dfb30d3daacb59d18790bb797d9994edf4b51b174a48423405ce216cd63",
+        "same_bytes_decode_pixel_exact": true,
+        "provider_seconds": 2.074084399999265,
+        "worker_memory": {
+          "pid": 13592,
+          "peak_working_set_bytes": 538013696,
+          "peak_committed_bytes": 756617216
+        }
+      },
+      "peak_working_set_bytes": 538013696
+    },
+    {
+      "case": "resource_48MP",
+      "status": "PASS",
+      "pid": 15612,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 4.570619800000713,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 1242234880,
+      "job_peak_committed_bytes": 1244319744,
+      "launcher_peak_working_set_bytes": 4386816,
+      "response": {
+        "megapixels_requested": 48,
+        "size_px": [
+          8000,
+          6000
+        ],
+        "decoded_pixels": 48000000,
+        "output_bytes": 151918351,
+        "sha256": "214eb7a9cd1b4746cfba97eb790829b7e97f38569e06487f90599a64350a2c58",
+        "same_bytes_decode_pixel_exact": true,
+        "provider_seconds": 4.13099560000046,
+        "worker_memory": {
+          "pid": 11252,
+          "peak_working_set_bytes": 1022369792,
+          "peak_committed_bytes": 1242234880
+        }
+      },
+      "peak_working_set_bytes": 1022369792
+    },
+    {
+      "case": "resource_64MP",
+      "status": "PASS",
+      "pid": 4604,
+      "exit_code": 0,
+      "termination": null,
+      "elapsed_seconds": 5.858185799999774,
+      "assigned_before_resume": true,
+      "stderr": "",
+      "job_peak_process_committed_bytes": 1565327360,
+      "job_peak_committed_bytes": 1567424512,
+      "launcher_peak_working_set_bytes": 4390912,
+      "response": {
+        "megapixels_requested": 64,
+        "size_px": [
+          9237,
+          6928
+        ],
+        "decoded_pixels": 63993936,
+        "output_bytes": 202536262,
+        "sha256": "8f58dde0159b8529ca21976483cd3314230497ca9d08e5f4898f4abfc724b73e",
+        "same_bytes_decode_pixel_exact": true,
+        "provider_seconds": 5.495296699999017,
+        "worker_memory": {
+          "pid": 1192,
+          "peak_working_set_bytes": 1345069056,
+          "peak_committed_bytes": 1565327360
+        }
+      },
+      "peak_working_set_bytes": 1345069056
+    }
+  ],
+  "status": "PASS",
+  "disk_bytes": 471743492,
+  "qualified_envelope": "See actual cases: synthetic RGB rasters only; no production ingestion/limits implemented",
+  "unqualified_limits": [
+    "512MiB input file",
+    "2GiB source bytes/run",
+    "500-frame batch",
+    "10GiB run budget/free reserve",
+    "general hostile-input CPU budget"
+  ],
+  "security_scope": "Job Object controls resources/lifetime, not a security sandbox",
+  "password_not_in_report_or_argv": true
+}

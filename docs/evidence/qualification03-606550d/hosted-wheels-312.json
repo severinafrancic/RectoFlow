@@ -1,0 +1,562 @@
+[
+  {
+    "file": "altgraph-0.17.5-py2.py3-none-any.whl",
+    "package": "altgraph",
+    "version": "0.17.5",
+    "bytes": 21228,
+    "sha256": "f3a22400bce1b0c701683820ac4f3b159cd301acab067c51c653e06961600597",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "altgraph-0.17.5.dist-info/LICENSE",
+        "bytes": 1002,
+        "sha256": "6c194d6db0c64d45535d10c95142b9b0cda7b7dcc7f1ddee302b3d536f3dbe46"
+      }
+    ]
+  },
+  {
+    "file": "charset_normalizer-3.5.2-cp312-cp312-win_amd64.whl",
+    "package": "charset_normalizer",
+    "version": "3.5.2",
+    "bytes": 207486,
+    "sha256": "780fbe7cab297b81dad9fb8dc5eb003c0468ffb0d9e5f65068c53a34661a96bc",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "charset_normalizer-3.5.2.dist-info/licenses/LICENSE",
+        "bytes": 1092,
+        "sha256": "18577485d3704f1a479ded8e573c0976cfed315fd2fd17983fa988da4c2f70d1"
+      }
+    ]
+  },
+  {
+    "file": "comtypes-1.4.17-py3-none-any.whl",
+    "package": "comtypes",
+    "version": "1.4.17",
+    "bytes": 298743,
+    "sha256": "4e0a221dde2c589b82977bed802efd71cd5eb67a380347b732e02735e597f586",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "comtypes-1.4.17.dist-info/licenses/LICENSE.txt",
+        "bytes": 1273,
+        "sha256": "3b1767f010980b46926b23bf0afce5d72f3359ee5e2b27baca71b9b4209ab383"
+      }
+    ]
+  },
+  {
+    "file": "numpy-2.4.6-cp312-cp312-win_amd64.whl",
+    "package": "numpy",
+    "version": "2.4.6",
+    "bytes": 12321687,
+    "sha256": "d8e8286dd7cea7895157318d1b91cdacac64c479f3cbc8dce548331728484751",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "numpy/ma/LICENSE",
+        "bytes": 1616,
+        "sha256": "d78dbb208b80d92b4d333e41a4baae50d12444f46e53199fa7726a91de6e2da7"
+      },
+      {
+        "wheel_member": "numpy/random/LICENSE.md",
+        "bytes": 3582,
+        "sha256": "b4bc2f4fa1c95778f1ed3dd8f14706bece399475b978f9f34b5d3cd72521b48a"
+      },
+      {
+        "wheel_member": "numpy/_core/include/numpy/random/LICENSE.txt",
+        "bytes": 1039,
+        "sha256": "d544761558b510866c21f7e8a2d5716fca76e0b98117e3b6b86314db7244d150"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/LICENSE.txt",
+        "bytes": 45831,
+        "sha256": "a804dff0ead9fadc5293456410bcbfc32bf024be9c4513459663fb7b442d2341"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/fft/pocketfft/LICENSE.md",
+        "bytes": 1523,
+        "sha256": "8db000e158c162e7249787852d8c69764706502ccee725c06641b31c1e95c8af"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/linalg/lapack_lite/LICENSE.txt",
+        "bytes": 2314,
+        "sha256": "19060ef465e1797d682ee0fc3081bd25ab1395e995e43d25c9d13c95d9a3cd6b"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/ma/LICENSE",
+        "bytes": 1616,
+        "sha256": "d78dbb208b80d92b4d333e41a4baae50d12444f46e53199fa7726a91de6e2da7"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/random/LICENSE.md",
+        "bytes": 3582,
+        "sha256": "b4bc2f4fa1c95778f1ed3dd8f14706bece399475b978f9f34b5d3cd72521b48a"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/random/src/distributions/LICENSE.md",
+        "bytes": 2805,
+        "sha256": "cf5619f25b112d5ce7c896efffc8e610bcb345dfadcc19f2c1460aa48fff2c9e"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/random/src/mt19937/LICENSE.md",
+        "bytes": 2986,
+        "sha256": "92c10699884321f1c2947fe2a70ab23b0fbf1507f756d89dd08f38c61fc3d4fa"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/random/src/pcg64/LICENSE.md",
+        "bytes": 1176,
+        "sha256": "41190663b77bee5302386495a07b7eabfbfa571aa0ae2f11da6764162062fc4f"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/random/src/philox/LICENSE.md",
+        "bytes": 1540,
+        "sha256": "322ac46d870c8aeead6c53adcccc839296fb3c8e456eae155081297daf7f8013"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/random/src/sfc64/LICENSE.md",
+        "bytes": 1253,
+        "sha256": "28cad82ce1379dc529df30da78ec012d7d0d1d576b03ddcb93388aee53659f59"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/random/src/splitmix64/LICENSE.md",
+        "bytes": 340,
+        "sha256": "454ec7350e478e037061850b67395753b425b1cb0a34bbc26290b020bf89d763"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/_core/include/numpy/libdivide/LICENSE.txt",
+        "bytes": 1039,
+        "sha256": "d544761558b510866c21f7e8a2d5716fca76e0b98117e3b6b86314db7244d150"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/_core/src/common/pythoncapi-compat/COPYING",
+        "bytes": 704,
+        "sha256": "aea41976c720f91bd19725c16916a1ace40eb1ea42620d340e587a5de4bbcea0"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/_core/src/highway/LICENSE",
+        "bytes": 21155,
+        "sha256": "d208152e2777ffd0126eacc1bd21c0320d69e4e6b622d21a2a12a47e8ef73763"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/_core/src/multiarray/dragon4_LICENSE.txt",
+        "bytes": 1441,
+        "sha256": "b0fd592d4ead563148e3977e7b589169d46a5ef2ff133c755a81af880a3fc919"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/_core/src/npysort/x86-simd-sort/LICENSE.md",
+        "bytes": 1542,
+        "sha256": "a732977853530066790c42817087f4829b518dd98d340c916acbfd227e39d3cb"
+      },
+      {
+        "wheel_member": "numpy-2.4.6.dist-info/licenses/numpy/_core/src/umath/svml/LICENSE",
+        "bytes": 1573,
+        "sha256": "585483905b13d4b42f800c55ba99e89d6e2e33ccd5f503e201c07531d148ff41"
+      }
+    ]
+  },
+  {
+    "file": "opencv_python_headless-5.0.0.93-cp37-abi3-win_amd64.whl",
+    "package": "opencv_python_headless",
+    "version": "5.0.0.93",
+    "bytes": 43825962,
+    "sha256": "829717b6a95554f273e49e357cee3b3a2a26b6f4842fbc1bed2b45bdd8f87e0e",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "cv2/LICENSE-3RD-PARTY.txt",
+        "bytes": 183251,
+        "sha256": "c1d60169b55cee56452b227c2fd2a7b9ddda3dd3741065f1c6201072be73fadb"
+      },
+      {
+        "wheel_member": "cv2/LICENSE.txt",
+        "bytes": 1090,
+        "sha256": "edef0fac1eb08d29d34563f724742e078da2513e196133a12c6ad9ff01e26107"
+      },
+      {
+        "wheel_member": "opencv_python_headless-5.0.0.93.dist-info/LICENSE-3RD-PARTY.txt",
+        "bytes": 183251,
+        "sha256": "c1d60169b55cee56452b227c2fd2a7b9ddda3dd3741065f1c6201072be73fadb"
+      },
+      {
+        "wheel_member": "opencv_python_headless-5.0.0.93.dist-info/LICENSE.txt",
+        "bytes": 1090,
+        "sha256": "edef0fac1eb08d29d34563f724742e078da2513e196133a12c6ad9ff01e26107"
+      }
+    ]
+  },
+  {
+    "file": "packaging-26.3-py3-none-any.whl",
+    "package": "packaging",
+    "version": "26.3",
+    "bytes": 129956,
+    "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "packaging/licenses/__init__.py",
+        "bytes": 7859,
+        "sha256": "590d12eee73ddbec53b4e9ee5bfc64d9cb3aacb4940e8ebcba260757ce56740b"
+      },
+      {
+        "wheel_member": "packaging/licenses/_spdx.py",
+        "bytes": 51122,
+        "sha256": "596ec35e2ca0ebcba9fd8343ff0a51625af548786257815f24b41f7e08613314"
+      },
+      {
+        "wheel_member": "packaging-26.3.dist-info/licenses/LICENSE",
+        "bytes": 197,
+        "sha256": "cad1ef5bd340d73e074ba614d26f7deaca5c7940c3d8c34852e65c4909686c48"
+      },
+      {
+        "wheel_member": "packaging-26.3.dist-info/licenses/LICENSE.APACHE",
+        "bytes": 10174,
+        "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+      },
+      {
+        "wheel_member": "packaging-26.3.dist-info/licenses/LICENSE.BSD",
+        "bytes": 1344,
+        "sha256": "b70e7e9b742f1cc6f948b34c16aa39ffece94196364bc88ff0d2180f0028fac5"
+      }
+    ]
+  },
+  {
+    "file": "pefile-2024.8.26-py3-none-any.whl",
+    "package": "pefile",
+    "version": "2024.8.26",
+    "bytes": 74766,
+    "sha256": "76f8b485dcd3b1bb8166f1128d395fa3d87af26360c2358fb75b80019b957c6f",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "pefile-2024.8.26.dist-info/LICENSE",
+        "bytes": 1083,
+        "sha256": "b44409c067c6da52bfb54bb6624fb11a7b52157c3a13ae1400232f8196e86ad3"
+      }
+    ]
+  },
+  {
+    "file": "pillow-12.3.0-cp312-cp312-win_amd64.whl",
+    "package": "pillow",
+    "version": "12.3.0",
+    "bytes": 7227137,
+    "sha256": "a2b55dd6b2a4c4b7d87ffa56bdb33fdc5fdb9a462173861a7bc097f17d91cb09",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "pillow-12.3.0.dist-info/licenses/LICENSE",
+        "bytes": 78016,
+        "sha256": "4f7866a74802c6326f81faff59a56546b6aec2b10b91973e0e9308de95e79857"
+      }
+    ]
+  },
+  {
+    "file": "pyinstaller-6.22.3-py3-none-win_amd64.whl",
+    "package": "pyinstaller",
+    "version": "6.22.3",
+    "bytes": 1454907,
+    "sha256": "500bd58c7bf7e584a8435adccbd763a0b918d5c12b08d74ff50fd79b2915458b",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "pyinstaller-6.22.3.dist-info/licenses/COPYING.txt",
+        "bytes": 32604,
+        "sha256": "0598064c7d2718e38d7914a7d08343b2fa008e3bea9ebba2aa7a6ffa5900dd64"
+      }
+    ]
+  },
+  {
+    "file": "pyinstaller_hooks_contrib-2026.8-py3-none-any.whl",
+    "package": "pyinstaller_hooks_contrib",
+    "version": "2026.8",
+    "bytes": 462145,
+    "sha256": "6d21d65323ea4467753afc21f52d7d0e69416ae8101dd88269bf273ad48db084",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "pyinstaller_hooks_contrib-2026.8.dist-info/licenses/LICENSE",
+        "bytes": 27666,
+        "sha256": "91d0baaff00773038e72c0a1fc9d5d2d38706b7a2b9c04f34296608f931b9cd0"
+      }
+    ]
+  },
+  {
+    "file": "pypdf-6.19.0-py3-none-any.whl",
+    "package": "pypdf",
+    "version": "6.19.0",
+    "bytes": 395480,
+    "sha256": "7e5d6e730e7dae87d560a2cee218b852f6498c8be61966f3cd02ead971e48d14",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "pypdf-6.19.0.dist-info/licenses/LICENSE",
+        "bytes": 1605,
+        "sha256": "a97ac230e5f33ef10a5367a850eb01f91f1a0b064e34742c7794d2294557f524"
+      }
+    ]
+  },
+  {
+    "file": "pypdfium2-5.14.0-py3-none-win_amd64.whl",
+    "package": "pypdfium2",
+    "version": "5.14.0",
+    "bytes": 3947280,
+    "sha256": "149fd5c6397b8df8bf7911a93506eff0be874f877afe7ac936cf5d37d21a6a06",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/LICENSES/Apache-2.0.txt",
+        "bytes": 11560,
+        "sha256": "3ddf9be5c28fe27dad143a5dc76eea25222ad1dd68934a047064e56ed2fa40c5"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/LICENSES/BSD-3-Clause.txt",
+        "bytes": 1485,
+        "sha256": "ad9a9e823df025f42389c1812eae28019f657d1ed7b3a4ebfd5010b0736a0da4"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/LICENSES/CC-BY-4.0.txt",
+        "bytes": 14844,
+        "sha256": "f1b1748301cd4274f46733c218d510929661b4990855de5fc645dacd69c4371c"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/abseil.txt",
+        "bytes": 11564,
+        "sha256": "f54fff0b905df5b3464527c652a30e903b172d6dcab4d89b5e6f105d5e4a4603"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/agg23.txt",
+        "bytes": 725,
+        "sha256": "c110d3ea2ad77467ce0dcff7d3337e6c8be8049a5103f4b9bd5fd911a77972e5"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/fast_float.txt",
+        "bytes": 1106,
+        "sha256": "bf1b57355feca8fce77ee95f48002f8d4789fb71b30ec7599c06cda4901fbb2b"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/freetype.txt",
+        "bytes": 6741,
+        "sha256": "f4b133e25df1f86ad3ffea453aa0e613f0474f34778dbbb3e437e7b2724937d8"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/icu.txt",
+        "bytes": 28286,
+        "sha256": "93679f4389d53b6835d89843f251844fb9bc455b35bab036d3c8e7abe497a47a"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/lcms.txt",
+        "bytes": 1353,
+        "sha256": "7312b68c5b25e9bf2b828706fb4e29588f22705112f411fd42e1f7d84c3d139a"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/libjpeg_turbo.ijg",
+        "bytes": 13059,
+        "sha256": "db16a04128171879c60708d171b88d97345a2dd20f9bfc173680a4497c73f704"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/libjpeg_turbo.md",
+        "bytes": 5755,
+        "sha256": "be2b2b5ab168bce87bc3e31f2a5c5adba4b7f6e9e51d618e958d1d46972ebd95"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/libopenjpeg.txt",
+        "bytes": 1794,
+        "sha256": "c5ab0890a737c2dfa7ba675036554f6d17741d98629b0c2a145354d00617e6b2"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/libpng.txt",
+        "bytes": 5479,
+        "sha256": "452390433ba0f88aa3e2b122c647741b72a0c117cd6ed7a329b49785aecb5511"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/llvm-libc.txt",
+        "bytes": 15418,
+        "sha256": "3b6226c32e168c83b891d8d6f0d3c29c2116dc3ef93dc93c307b54f279ecf383"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/pdfium-binaries.txt",
+        "bytes": 1184,
+        "sha256": "8854f4388f1ca13b3ad9baa42e95f5546b4c0b17109c159256d3eca7be39b09b"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/pdfium.txt",
+        "bytes": 12818,
+        "sha256": "961eacd9633fff6d051db7208b755e9210e30efac7adec3e6a6d52798f0ccf0e"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/simdutf.txt",
+        "bytes": 1077,
+        "sha256": "c172a0ba936ff31230febb5dad869e25cb7c1a07480c7a381be8cf011bb52719"
+      },
+      {
+        "wheel_member": "pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/zlib.txt",
+        "bytes": 1332,
+        "sha256": "33fd641c9f3b0e0be64bc78fea9e94807674cdd70c48477599226cb8956565fe"
+      }
+    ]
+  },
+  {
+    "file": "pywin32_ctypes-0.2.3-py3-none-any.whl",
+    "package": "pywin32_ctypes",
+    "version": "0.2.3",
+    "bytes": 30756,
+    "sha256": "8a1513379d709975552d202d942d9837758905c8d01eb82b8bcc30918929e7b8",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "pywin32_ctypes-0.2.3.dist-info/LICENSE.txt",
+        "bytes": 1644,
+        "sha256": "dfa83b3e2709adfcdb838d9ad55823ca674abb780e60563d9dd9544ccbf785e9"
+      }
+    ]
+  },
+  {
+    "file": "reportlab-4.5.1-py3-none-any.whl",
+    "package": "reportlab",
+    "version": "4.5.1",
+    "bytes": 1957812,
+    "sha256": "06fce8cb56c83307cfa4909cdf4e6a2ddbb44e5d6ef4d2edca896d7e9769f091",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "reportlab/fonts/DarkGarden-copying-gpl.txt",
+        "bytes": 17976,
+        "sha256": "1b2a567f289f66a143c56353e7b3d4fa5862514a5e3c5cfdf8b02ee5e5aaa953"
+      },
+      {
+        "wheel_member": "reportlab/fonts/DarkGarden-copying.txt",
+        "bytes": 1318,
+        "sha256": "3cd1020510efa7f6b3166a5a2740f92bd664a695ea179e0bda442e74cd0ef3a4"
+      },
+      {
+        "wheel_member": "reportlab/fonts/bitstream-vera-license.txt",
+        "bytes": 5954,
+        "sha256": "3361d054759a2fc686a2c058be82deaf9c2e6fe549be9004d7935a6c1736315d"
+      },
+      {
+        "wheel_member": "reportlab-4.5.1.dist-info/licenses/LICENSE",
+        "bytes": 1707,
+        "sha256": "ef831761646313921375fc2cb888e8eeaf7da213d0b92852c10c42f3a0b4d138"
+      }
+    ]
+  },
+  {
+    "file": "setuptools-84.0.0-py3-none-any.whl",
+    "package": "setuptools",
+    "version": "84.0.0",
+    "bytes": 818216,
+    "sha256": "51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "setuptools/_vendor/importlib_metadata-8.7.1.dist-info/licenses/LICENSE",
+        "bytes": 10278,
+        "sha256": "458502e12d97bbf64438606a20044aa85eb05fb0a8a807bb35dbec253fd1fc04"
+      },
+      {
+        "wheel_member": "setuptools/_vendor/jaraco_context-6.1.0.dist-info/licenses/LICENSE",
+        "bytes": 1076,
+        "sha256": "9755a18519666e5f0f4cae3daad3d7012bcae48a600b31237d75e9fe134e6683"
+      },
+      {
+        "wheel_member": "setuptools/_vendor/jaraco_functools-4.4.0.dist-info/licenses/LICENSE",
+        "bytes": 1076,
+        "sha256": "5a57cb4db85e2a2dd88c290628908add57e3451449e0a9a71fdfb38776fd759d"
+      },
+      {
+        "wheel_member": "setuptools/_vendor/more_itertools-10.8.0.dist-info/licenses/LICENSE",
+        "bytes": 1053,
+        "sha256": "09f1c8c9e941af3e584d59641ea9b87d83c0cb0fd007eb5ef391a7e2643c1a46"
+      },
+      {
+        "wheel_member": "setuptools/_vendor/packaging/licenses/__init__.py",
+        "bytes": 5819,
+        "sha256": "4f05cb1d9097c1281d17044b3f15bad364fa99289eba74851cce9fa7ca605bbf"
+      },
+      {
+        "wheel_member": "setuptools/_vendor/packaging/licenses/_spdx.py",
+        "bytes": 51122,
+        "sha256": "596ec35e2ca0ebcba9fd8343ff0a51625af548786257815f24b41f7e08613314"
+      },
+      {
+        "wheel_member": "setuptools/_vendor/packaging-26.0.dist-info/licenses/LICENSE",
+        "bytes": 197,
+        "sha256": "cad1ef5bd340d73e074ba614d26f7deaca5c7940c3d8c34852e65c4909686c48"
+      },
+      {
+        "wheel_member": "setuptools/_vendor/packaging-26.0.dist-info/licenses/LICENSE.APACHE",
+        "bytes": 10174,
+        "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+      },
+      {
+        "wheel_member": "setuptools/_vendor/packaging-26.0.dist-info/licenses/LICENSE.BSD",
+        "bytes": 1344,
+        "sha256": "b70e7e9b742f1cc6f948b34c16aa39ffece94196364bc88ff0d2180f0028fac5"
+      },
+      {
+        "wheel_member": "setuptools/_vendor/platformdirs-4.4.0.dist-info/licenses/LICENSE",
+        "bytes": 1089,
+        "sha256": "29e0fd62e929850e86eb28c3fdccf0cefdf4fa94879011cffb3d0d4bed6d4db6"
+      },
+      {
+        "wheel_member": "setuptools/_vendor/tomli-2.4.0.dist-info/licenses/LICENSE",
+        "bytes": 1072,
+        "sha256": "b80816b0d530b8accb4c2211783790984a6e3b61922c2b5ee92f3372ab2742fe"
+      },
+      {
+        "wheel_member": "setuptools/_vendor/wheel-0.46.3.dist-info/licenses/LICENSE.txt",
+        "bytes": 1107,
+        "sha256": "30c23618679108f3e8ea1d2a658c7ca417bdfc891c98ef1a89fa4ff0c9828654"
+      },
+      {
+        "wheel_member": "setuptools/_vendor/zipp-3.23.0.dist-info/licenses/LICENSE",
+        "bytes": 1076,
+        "sha256": "5a57cb4db85e2a2dd88c290628908add57e3451449e0a9a71fdfb38776fd759d"
+      },
+      {
+        "wheel_member": "setuptools/config/NOTICE",
+        "bytes": 493,
+        "sha256": "2dddf08818297a3b89d43d95ff659d8da85741108c9136dfa3a4d856c0623bd8"
+      },
+      {
+        "wheel_member": "setuptools/config/_validate_pyproject/NOTICE",
+        "bytes": 18737,
+        "sha256": "09c9bcea95ca086f8bc5bed174e40bc835b297d40fb5f86bbbb570fe0a5581a7"
+      },
+      {
+        "wheel_member": "setuptools-84.0.0.dist-info/licenses/LICENSE",
+        "bytes": 1023,
+        "sha256": "86da0f01aeae46348a3c3d465195dc1ceccde79f79e87769a64b8da04b2a4741"
+      },
+      {
+        "wheel_member": "setuptools/_vendor/autocommand-2.2.2.dist-info/LICENSE",
+        "bytes": 7634,
+        "sha256": "ade78d04982d69972d444a8e14a94f87a2334dd3855cc80348ea8e240aa0df2d"
+      },
+      {
+        "wheel_member": "setuptools/_vendor/backports.tarfile-1.2.0.dist-info/LICENSE",
+        "bytes": 1023,
+        "sha256": "86da0f01aeae46348a3c3d465195dc1ceccde79f79e87769a64b8da04b2a4741"
+      },
+      {
+        "wheel_member": "setuptools/_vendor/jaraco.text-4.0.0.dist-info/LICENSE",
+        "bytes": 1023,
+        "sha256": "86da0f01aeae46348a3c3d465195dc1ceccde79f79e87769a64b8da04b2a4741"
+      }
+    ]
+  },
+  {
+    "file": "uiautomation-2.0.29-py3-none-any.whl",
+    "package": "uiautomation",
+    "version": "2.0.29",
+    "bytes": 198985,
+    "sha256": "5dd51c9e77e70470142a13d903be67f256c445e7cf20b47ada0ece2bdaff9f32",
+    "pypi_match": true,
+    "licenses": [
+      {
+        "wheel_member": "uiautomation-2.0.29.dist-info/LICENSE",
+        "bytes": 11537,
+        "sha256": "7c36172b09fab176720232be85384cb1d5cc64ee40dd0f50d335ba04aa3d71fb"
+      }
+    ]
+  }
+]

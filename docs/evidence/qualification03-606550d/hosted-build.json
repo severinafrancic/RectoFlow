@@ -1,0 +1,9 @@
+{
+  "subject_sha": "606550d2541f7b00554786c721a291d1df14070c",
+  "tree": "8b2796290e9c6efd3fe70a27510edf9edff80aba",
+  "zip_bytes": 85833276,
+  "zip_sha256": "3cad2b78643a231a2e6c82bbf689336a7768b0430e41938a281b98d4b5065f73",
+  "extracted_bytes": 214342166,
+  "native_count": 101,
+  "exe": "D:\\a\\RectoFlow\\RectoFlow\\.build-spike03\\ci\\bundle\\relocated\\RectoFlowSpike03\\RectoFlowSpike03.exe"
+}

@@ -1,0 +1,1072 @@
+{
+  "schema": 1,
+  "producer": "Codex",
+  "producer_role": "BUILDER",
+  "authority": "QUALIFICATION_ONLY_NOT_INDEPENDENT_ACCEPTANCE",
+  "recorded_utc": "2026-10-07T19:08:32.105367+00:00",
+  "repository": "https://github.com/severinafrancic/RectoFlow",
+  "canonical_checkout": "D:/Projekte/RectoFlow",
+  "branch": "feature/rectoflow-0.3-document-ingestion",
+  "base_sha": "05ae40615a5b62227857e3477cfd484a116f3a5a",
+  "base_tree": "81f443ccd1409363c77caa5325557b30b1b59a28",
+  "tested_subject_sha": "606550d2541f7b00554786c721a291d1df14070c",
+  "tested_tree": "8b2796290e9c6efd3fe70a27510edf9edff80aba",
+  "public_subject_verified_with_ls_remote": true,
+  "verdict": "REQUIRED_CHANGE",
+  "PR1_ready": false,
+  "lifecycle": "INDEPENDENT_REVIEW_PENDING",
+  "primitive_checks": {
+    "local-source.json": [
+      {
+        "case": "providers",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_bound_bytes_geometry",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_password_private_pipe",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_wrong_password",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_corrupt",
+        "status": "PASS"
+      },
+      {
+        "case": "tiff_frames_container_policy",
+        "status": "PASS"
+      },
+      {
+        "case": "image_corrupt",
+        "status": "PASS"
+      },
+      {
+        "case": "image_giant_preflight",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_page_count_preflight",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_giant_geometry_preflight",
+        "status": "PASS"
+      },
+      {
+        "case": "partial_write_not_published",
+        "status": "PASS"
+      },
+      {
+        "case": "perspective_deskew_goldens",
+        "status": "PASS"
+      },
+      {
+        "case": "job_memory_limit",
+        "status": "PASS"
+      },
+      {
+        "case": "job_timeout",
+        "status": "PASS"
+      },
+      {
+        "case": "job_cancel",
+        "status": "PASS"
+      },
+      {
+        "case": "worker_crash_contained",
+        "status": "PASS"
+      },
+      {
+        "case": "job_parent_death",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_1MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_12MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_24MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_48MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_64MP",
+        "status": "PASS"
+      }
+    ],
+    "local-frozen.json": [
+      {
+        "case": "providers",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_bound_bytes_geometry",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_password_private_pipe",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_wrong_password",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_corrupt",
+        "status": "PASS"
+      },
+      {
+        "case": "tiff_frames_container_policy",
+        "status": "PASS"
+      },
+      {
+        "case": "image_corrupt",
+        "status": "PASS"
+      },
+      {
+        "case": "image_giant_preflight",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_page_count_preflight",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_giant_geometry_preflight",
+        "status": "PASS"
+      },
+      {
+        "case": "partial_write_not_published",
+        "status": "PASS"
+      },
+      {
+        "case": "perspective_deskew_goldens",
+        "status": "PASS"
+      },
+      {
+        "case": "job_memory_limit",
+        "status": "PASS"
+      },
+      {
+        "case": "job_timeout",
+        "status": "PASS"
+      },
+      {
+        "case": "job_cancel",
+        "status": "PASS"
+      },
+      {
+        "case": "worker_crash_contained",
+        "status": "PASS"
+      },
+      {
+        "case": "job_parent_death",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_1MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_12MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_24MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_48MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_64MP",
+        "status": "PASS"
+      }
+    ],
+    "hosted-source-311.json": [
+      {
+        "case": "providers",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_bound_bytes_geometry",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_password_private_pipe",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_wrong_password",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_corrupt",
+        "status": "PASS"
+      },
+      {
+        "case": "tiff_frames_container_policy",
+        "status": "PASS"
+      },
+      {
+        "case": "image_corrupt",
+        "status": "PASS"
+      },
+      {
+        "case": "image_giant_preflight",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_page_count_preflight",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_giant_geometry_preflight",
+        "status": "PASS"
+      },
+      {
+        "case": "partial_write_not_published",
+        "status": "PASS"
+      },
+      {
+        "case": "perspective_deskew_goldens",
+        "status": "PASS"
+      },
+      {
+        "case": "job_memory_limit",
+        "status": "PASS"
+      },
+      {
+        "case": "job_timeout",
+        "status": "PASS"
+      },
+      {
+        "case": "job_cancel",
+        "status": "PASS"
+      },
+      {
+        "case": "worker_crash_contained",
+        "status": "PASS"
+      },
+      {
+        "case": "job_parent_death",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_1MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_12MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_24MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_48MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_64MP",
+        "status": "PASS"
+      }
+    ],
+    "hosted-source-312.json": [
+      {
+        "case": "providers",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_bound_bytes_geometry",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_password_private_pipe",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_wrong_password",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_corrupt",
+        "status": "PASS"
+      },
+      {
+        "case": "tiff_frames_container_policy",
+        "status": "PASS"
+      },
+      {
+        "case": "image_corrupt",
+        "status": "PASS"
+      },
+      {
+        "case": "image_giant_preflight",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_page_count_preflight",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_giant_geometry_preflight",
+        "status": "PASS"
+      },
+      {
+        "case": "partial_write_not_published",
+        "status": "PASS"
+      },
+      {
+        "case": "perspective_deskew_goldens",
+        "status": "PASS"
+      },
+      {
+        "case": "job_memory_limit",
+        "status": "PASS"
+      },
+      {
+        "case": "job_timeout",
+        "status": "PASS"
+      },
+      {
+        "case": "job_cancel",
+        "status": "PASS"
+      },
+      {
+        "case": "worker_crash_contained",
+        "status": "PASS"
+      },
+      {
+        "case": "job_parent_death",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_1MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_12MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_24MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_48MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_64MP",
+        "status": "PASS"
+      }
+    ],
+    "hosted-frozen-312.json": [
+      {
+        "case": "providers",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_bound_bytes_geometry",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_password_private_pipe",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_wrong_password",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_corrupt",
+        "status": "PASS"
+      },
+      {
+        "case": "tiff_frames_container_policy",
+        "status": "PASS"
+      },
+      {
+        "case": "image_corrupt",
+        "status": "PASS"
+      },
+      {
+        "case": "image_giant_preflight",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_page_count_preflight",
+        "status": "PASS"
+      },
+      {
+        "case": "pdf_giant_geometry_preflight",
+        "status": "PASS"
+      },
+      {
+        "case": "partial_write_not_published",
+        "status": "PASS"
+      },
+      {
+        "case": "perspective_deskew_goldens",
+        "status": "PASS"
+      },
+      {
+        "case": "job_memory_limit",
+        "status": "PASS"
+      },
+      {
+        "case": "job_timeout",
+        "status": "PASS"
+      },
+      {
+        "case": "job_cancel",
+        "status": "PASS"
+      },
+      {
+        "case": "worker_crash_contained",
+        "status": "PASS"
+      },
+      {
+        "case": "job_parent_death",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_1MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_12MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_24MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_48MP",
+        "status": "PASS"
+      },
+      {
+        "case": "resource_64MP",
+        "status": "PASS"
+      }
+    ]
+  },
+  "resource_measurements": {
+    "local-source.json": [
+      {
+        "case": "resource_1MP",
+        "elapsed_seconds": 0.40171270000064396,
+        "peak_working_set_bytes": 73568256,
+        "job_peak_process_committed_bytes": 291364864,
+        "dimensions": [
+          1154,
+          866
+        ],
+        "pixels": 999364,
+        "png_bytes": 3163960,
+        "png_sha256": "ddf2a463c0bf61d37cc4c08255991632fef64b1dff92dfa71421611a7597afe1",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_12MP",
+        "elapsed_seconds": 1.4029885000018112,
+        "peak_working_set_bytes": 296316928,
+        "job_peak_process_committed_bytes": 514580480,
+        "dimensions": [
+          4000,
+          3000
+        ],
+        "pixels": 12000000,
+        "png_bytes": 37981629,
+        "png_sha256": "43b5b7581673f6dded741be0cd948100565856281b7c47722e961f84b1def2db",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_24MP",
+        "elapsed_seconds": 2.475805100002617,
+        "peak_working_set_bytes": 538013696,
+        "job_peak_process_committed_bytes": 756617216,
+        "dimensions": [
+          5656,
+          4243
+        ],
+        "pixels": 23998408,
+        "png_bytes": 75955360,
+        "png_sha256": "0b387dfb30d3daacb59d18790bb797d9994edf4b51b174a48423405ce216cd63",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_48MP",
+        "elapsed_seconds": 4.570619800000713,
+        "peak_working_set_bytes": 1022369792,
+        "job_peak_process_committed_bytes": 1242234880,
+        "dimensions": [
+          8000,
+          6000
+        ],
+        "pixels": 48000000,
+        "png_bytes": 151918351,
+        "png_sha256": "214eb7a9cd1b4746cfba97eb790829b7e97f38569e06487f90599a64350a2c58",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_64MP",
+        "elapsed_seconds": 5.858185799999774,
+        "peak_working_set_bytes": 1345069056,
+        "job_peak_process_committed_bytes": 1565327360,
+        "dimensions": [
+          9237,
+          6928
+        ],
+        "pixels": 63993936,
+        "png_bytes": 202536262,
+        "png_sha256": "8f58dde0159b8529ca21976483cd3314230497ca9d08e5f4898f4abfc724b73e",
+        "decode_same_bytes": true
+      }
+    ],
+    "local-frozen.json": [
+      {
+        "case": "resource_1MP",
+        "elapsed_seconds": 0.5664827000000514,
+        "peak_working_set_bytes": 80535552,
+        "job_peak_process_committed_bytes": 296275968,
+        "dimensions": [
+          1154,
+          866
+        ],
+        "pixels": 999364,
+        "png_bytes": 3163960,
+        "png_sha256": "ddf2a463c0bf61d37cc4c08255991632fef64b1dff92dfa71421611a7597afe1",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_12MP",
+        "elapsed_seconds": 1.4718191000029037,
+        "peak_working_set_bytes": 303202304,
+        "job_peak_process_committed_bytes": 519462912,
+        "dimensions": [
+          4000,
+          3000
+        ],
+        "pixels": 12000000,
+        "png_bytes": 37981629,
+        "png_sha256": "43b5b7581673f6dded741be0cd948100565856281b7c47722e961f84b1def2db",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_24MP",
+        "elapsed_seconds": 2.6218233999970835,
+        "peak_working_set_bytes": 544681984,
+        "job_peak_process_committed_bytes": 761782272,
+        "dimensions": [
+          5656,
+          4243
+        ],
+        "pixels": 23998408,
+        "png_bytes": 75955360,
+        "png_sha256": "0b387dfb30d3daacb59d18790bb797d9994edf4b51b174a48423405ce216cd63",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_48MP",
+        "elapsed_seconds": 4.707109999999375,
+        "peak_working_set_bytes": 1029632000,
+        "job_peak_process_committed_bytes": 1247666176,
+        "dimensions": [
+          8000,
+          6000
+        ],
+        "pixels": 48000000,
+        "png_bytes": 151918351,
+        "png_sha256": "214eb7a9cd1b4746cfba97eb790829b7e97f38569e06487f90599a64350a2c58",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_64MP",
+        "elapsed_seconds": 6.125942400001804,
+        "peak_working_set_bytes": 1351700480,
+        "job_peak_process_committed_bytes": 1570340864,
+        "dimensions": [
+          9237,
+          6928
+        ],
+        "pixels": 63993936,
+        "png_bytes": 202536262,
+        "png_sha256": "8f58dde0159b8529ca21976483cd3314230497ca9d08e5f4898f4abfc724b73e",
+        "decode_same_bytes": true
+      }
+    ],
+    "hosted-source-311.json": [
+      {
+        "case": "resource_1MP",
+        "elapsed_seconds": 0.4235339000000238,
+        "peak_working_set_bytes": 68591616,
+        "job_peak_process_committed_bytes": 155271168,
+        "dimensions": [
+          1154,
+          866
+        ],
+        "pixels": 999364,
+        "png_bytes": 3163960,
+        "png_sha256": "ddf2a463c0bf61d37cc4c08255991632fef64b1dff92dfa71421611a7597afe1",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_12MP",
+        "elapsed_seconds": 1.526836199999991,
+        "peak_working_set_bytes": 290914304,
+        "job_peak_process_committed_bytes": 378310656,
+        "dimensions": [
+          4000,
+          3000
+        ],
+        "pixels": 12000000,
+        "png_bytes": 37981629,
+        "png_sha256": "43b5b7581673f6dded741be0cd948100565856281b7c47722e961f84b1def2db",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_24MP",
+        "elapsed_seconds": 2.700073500000002,
+        "peak_working_set_bytes": 533176320,
+        "job_peak_process_committed_bytes": 620736512,
+        "dimensions": [
+          5656,
+          4243
+        ],
+        "pixels": 23998408,
+        "png_bytes": 75955360,
+        "png_sha256": "0b387dfb30d3daacb59d18790bb797d9994edf4b51b174a48423405ce216cd63",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_48MP",
+        "elapsed_seconds": 5.089656599999984,
+        "peak_working_set_bytes": 1017442304,
+        "job_peak_process_committed_bytes": 1106305024,
+        "dimensions": [
+          8000,
+          6000
+        ],
+        "pixels": 48000000,
+        "png_bytes": 151918351,
+        "png_sha256": "214eb7a9cd1b4746cfba97eb790829b7e97f38569e06487f90599a64350a2c58",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_64MP",
+        "elapsed_seconds": 6.679006900000019,
+        "peak_working_set_bytes": 1340182528,
+        "job_peak_process_committed_bytes": 1429704704,
+        "dimensions": [
+          9237,
+          6928
+        ],
+        "pixels": 63993936,
+        "png_bytes": 202536262,
+        "png_sha256": "8f58dde0159b8529ca21976483cd3314230497ca9d08e5f4898f4abfc724b73e",
+        "decode_same_bytes": true
+      }
+    ],
+    "hosted-source-312.json": [
+      {
+        "case": "resource_1MP",
+        "elapsed_seconds": 0.4217217000000062,
+        "peak_working_set_bytes": 72929280,
+        "job_peak_process_committed_bytes": 157736960,
+        "dimensions": [
+          1154,
+          866
+        ],
+        "pixels": 999364,
+        "png_bytes": 3163960,
+        "png_sha256": "ddf2a463c0bf61d37cc4c08255991632fef64b1dff92dfa71421611a7597afe1",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_12MP",
+        "elapsed_seconds": 1.5100358000000256,
+        "peak_working_set_bytes": 294252544,
+        "job_peak_process_committed_bytes": 378298368,
+        "dimensions": [
+          4000,
+          3000
+        ],
+        "pixels": 12000000,
+        "png_bytes": 37981629,
+        "png_sha256": "43b5b7581673f6dded741be0cd948100565856281b7c47722e961f84b1def2db",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_24MP",
+        "elapsed_seconds": 2.7060795000000155,
+        "peak_working_set_bytes": 536383488,
+        "job_peak_process_committed_bytes": 621068288,
+        "dimensions": [
+          5656,
+          4243
+        ],
+        "pixels": 23998408,
+        "png_bytes": 75955360,
+        "png_sha256": "0b387dfb30d3daacb59d18790bb797d9994edf4b51b174a48423405ce216cd63",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_48MP",
+        "elapsed_seconds": 5.0822668000000135,
+        "peak_working_set_bytes": 1021153280,
+        "job_peak_process_committed_bytes": 1107025920,
+        "dimensions": [
+          8000,
+          6000
+        ],
+        "pixels": 48000000,
+        "png_bytes": 151918351,
+        "png_sha256": "214eb7a9cd1b4746cfba97eb790829b7e97f38569e06487f90599a64350a2c58",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_64MP",
+        "elapsed_seconds": 6.680640299999993,
+        "peak_working_set_bytes": 1344167936,
+        "job_peak_process_committed_bytes": 1430855680,
+        "dimensions": [
+          9237,
+          6928
+        ],
+        "pixels": 63993936,
+        "png_bytes": 202536262,
+        "png_sha256": "8f58dde0159b8529ca21976483cd3314230497ca9d08e5f4898f4abfc724b73e",
+        "decode_same_bytes": true
+      }
+    ],
+    "hosted-frozen-312.json": [
+      {
+        "case": "resource_1MP",
+        "elapsed_seconds": 0.5018395999999825,
+        "peak_working_set_bytes": 79204352,
+        "job_peak_process_committed_bytes": 161308672,
+        "dimensions": [
+          1154,
+          866
+        ],
+        "pixels": 999364,
+        "png_bytes": 3163960,
+        "png_sha256": "ddf2a463c0bf61d37cc4c08255991632fef64b1dff92dfa71421611a7597afe1",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_12MP",
+        "elapsed_seconds": 1.583304400000003,
+        "peak_working_set_bytes": 301649920,
+        "job_peak_process_committed_bytes": 383864832,
+        "dimensions": [
+          4000,
+          3000
+        ],
+        "pixels": 12000000,
+        "png_bytes": 37981629,
+        "png_sha256": "43b5b7581673f6dded741be0cd948100565856281b7c47722e961f84b1def2db",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_24MP",
+        "elapsed_seconds": 2.7591375000000085,
+        "peak_working_set_bytes": 543633408,
+        "job_peak_process_committed_bytes": 626405376,
+        "dimensions": [
+          5656,
+          4243
+        ],
+        "pixels": 23998408,
+        "png_bytes": 75955360,
+        "png_sha256": "0b387dfb30d3daacb59d18790bb797d9994edf4b51b174a48423405ce216cd63",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_48MP",
+        "elapsed_seconds": 5.105918500000001,
+        "peak_working_set_bytes": 1028653056,
+        "job_peak_process_committed_bytes": 1112682496,
+        "dimensions": [
+          8000,
+          6000
+        ],
+        "pixels": 48000000,
+        "png_bytes": 151918351,
+        "png_sha256": "214eb7a9cd1b4746cfba97eb790829b7e97f38569e06487f90599a64350a2c58",
+        "decode_same_bytes": true
+      },
+      {
+        "case": "resource_64MP",
+        "elapsed_seconds": 6.676244400000002,
+        "peak_working_set_bytes": 1351135232,
+        "job_peak_process_committed_bytes": 1435893760,
+        "dimensions": [
+          9237,
+          6928
+        ],
+        "pixels": 63993936,
+        "png_bytes": 202536262,
+        "png_sha256": "8f58dde0159b8529ca21976483cd3314230497ca9d08e5f4898f4abfc724b73e",
+        "decode_same_bytes": true
+      }
+    ]
+  },
+  "environment": {
+    "local-source.json": {
+      "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+      "platform": "Windows-11-10.0.26200-SP0",
+      "mode": "SOURCE_LOCAL_OR_CI",
+      "disk_bytes": 471743492
+    },
+    "local-frozen.json": {
+      "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+      "platform": "Windows-11-10.0.26200-SP0",
+      "mode": "FROZEN_RELOCATED",
+      "disk_bytes": 471743494
+    },
+    "hosted-source-311.json": {
+      "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+      "platform": "Windows-10-10.0.26100-SP0",
+      "mode": "SOURCE_LOCAL_OR_CI",
+      "disk_bytes": 471743492
+    },
+    "hosted-source-312.json": {
+      "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+      "platform": "Windows-2025Server-10.0.26100-SP0",
+      "mode": "SOURCE_LOCAL_OR_CI",
+      "disk_bytes": 471743492
+    },
+    "hosted-frozen-312.json": {
+      "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+      "platform": "Windows-2025Server-10.0.26100-SP0",
+      "mode": "FROZEN_RELOCATED",
+      "disk_bytes": 471743492
+    }
+  },
+  "providers": {
+    "pypdfium2": "5.14.0",
+    "opencv-python-headless": "5.0.0.93",
+    "numpy": "2.4.6",
+    "Pillow": "12.3.0",
+    "pyinstaller": "6.22.3",
+    "pdfium": "156.0.8076.0",
+    "pdfium_flags": [],
+    "opencv": "5.0.0"
+  },
+  "regression": {
+    "local": {
+      "count": 129,
+      "seconds": 8.501,
+      "result": "PASS",
+      "log_sha256": "3345f3420b8570a7d06caf5acab7b7e5fcf10c2cd21e5d9e9c0a35fa80b6e762"
+    },
+    "hosted": {
+      "count_each": 129,
+      "python": [
+        "3.11",
+        "3.12"
+      ],
+      "result": "PASS",
+      "run_id": 37670215300
+    }
+  },
+  "hosted_run": "https://github.com/severinafrancic/RectoFlow/actions/runs/37670215300",
+  "retained_history": [
+    {
+      "subject": "8143e10f230d7839c7f963d6c49f67b457647c95",
+      "tree": "a85651592af7767647c48f48f7c909ba4ecf9853",
+      "run_id": 37668097792,
+      "result": "FAILED",
+      "finding": "OpenCV5 HoughLinesP returns a different result shape; old RSS sampled the venv redirector rather than actual worker. Those RAM numbers are invalid."
+    },
+    {
+      "subject": "65eb52627410d289c6a28ee7310025af65fa2508",
+      "tree": "1c7b84c03075732fafad4228163d09b9aa50bd15",
+      "run_id": 37668840843,
+      "result": "FAILED",
+      "finding": "Segment-length threshold misses resampled near-horizontal lines. Standard HoughLines replaced the fragile probe."
+    },
+    {
+      "subject": "e5a116790f9322c0726aba5359c079ac29fcb00d",
+      "tree": "0c239ad027fc2ca15b392260c54d739ffb5a0d0d",
+      "run_id": 37669316316,
+      "result": "PASS_18_PRIMITIVES_ONLY",
+      "limitation": "Did not include persisted PNG decode or four additional failure/preflight probes. Earlier RAM envelope cannot qualify current decode path."
+    }
+  ],
+  "qualified": [
+    "Exact provider imports on hosted Python3.11/3.12 and native local3.12; actual wheel bytes SHA verified against version-specific PyPI metadata; no provider substitution.",
+    "Four PDF pages from hash-bound bytes, effective CropBox/MediaBox/inherited boxes/90/180 rotation/mixed sizes; bitmap/page/document explicit close.",
+    "RC4-128 encrypted synthetic PDF succeeds with ephemeral pipe-only password; wrong password/corrupt PDF refused. Other encryption variants are not implied.",
+    "Three TIFF frames retain order and full frame. CONTAINER_PAGE_1 probe retains full proposal with no detection and additional proposal; not production detection.",
+    "Known perspective transform and 7degree deskew golden pass. No claim of general visual page detection or photo quality.",
+    "Worker suspended, assigned to memory-limited Job before resume/provider imports; memory refusal128MiB, timeout/cancel0.5s, worker exit17, own parent death terminate only own processes.",
+    "Synthetic RGB noise near1/12/24/48/64MP transforms and round-trips persisted PNG bytes with pixel equality; measured RAM/time/disk are not universal upper bounds.",
+    "Local and hosted actually executed relocated EXE with clean PATH and no ambient provider imports; all22 primitive cases pass.",
+    "Native/package members and all shipped wheel license/notice/copying materials plus CPython license inventoried; no blanket legal certification."
+  ],
+  "required_change": [
+    {
+      "id": "Q03-LIMIT-001",
+      "requirement": "Qualification of candidate input/batch/disk envelopes before GO",
+      "gap": "512MiB input file, 2GiB source bytes/run, 500-frame processing batch and 10GiB run budget/512MiB free reserve not tested. 501-page preflight proves rejection policy probe only. Fault-injected ENOSPC is not real filesystem full/quota evidence.",
+      "action": "Extend only qualification probes to exercise the chosen boundary and over-boundary budgets, or explicitly approve narrower measured limits and qualify those. No production feature work before requalification."
+    }
+  ],
+  "limit_recommendation": {
+    "worker": "Retain one full-size task and Job supervision. Tested default per-process memory2GiB and refusal at128MiB; not a security sandbox or aggregate multi-process memory guarantee.",
+    "raster": "64MP is a successful synthetic stress case only. Local decode peak1.49GiB commit leaves about0.51GiB below2GiB. Prefer initially qualifying48MP for the fuller future pipeline instead of assuming64MP headroom survives more buffers.",
+    "timeout": "Timeout/cancel primitive0.5s demonstrated; 60s remains configurable candidate, no general malicious-PDF throughput guarantee.",
+    "input_batch_disk": "Keep unqualified values provisional; no automatic adoption or silent cap reduction."
+  },
+  "boundary_audit": {
+    "producer": "Synthetic fixture generator / actual wheel bytes",
+    "consumer": "Standalone own Job-limited worker; no product entry points",
+    "source_of_truth": "Stored source bytes and actual wheel/package hashes; committed subject/source hashes",
+    "validation": "Builder harness verifies same bytes before native PDF/TIFF decoding; PNG same-byte round trip; explicit preflight probe",
+    "authorization": "Own processes/output paths only; no browser installs/no system policy changes",
+    "version": "Pinned exact candidates plus current lock; standalone workflow/package only",
+    "concurrency": "Sequential full-size workers, new per-case Job, unique per-run folder; no retries or shared cache",
+    "transaction": "Injected failed output remains temporary; original source/report evidence retained",
+    "recovery": "No resume; reports mark failed cases; own worker dies on parent job close. No production run-state code introduced.",
+    "rollback": "Git branch only; original main and C checkout unchanged; no existing evidence modified",
+    "invalidation": "Harness/provider/material composition changes require a new tested SHA/tree; evidence commit does not transfer tests to its own SHA"
+  },
+  "assumption_challenge": [
+    "Green22 primitives do not qualify all requested budgets: overall verdict remains REQUIRED_CHANGE.",
+    "Measuring redirector RSS would hide real worker memory: current reports use worker GetProcessMemoryInfo and Job committed peaks separately.",
+    "Persisted PNG decoding increases64MP RAM substantially: retained older18case evidence is not used for current envelope.",
+    "Provider UserUnit behavior is observed, not silently accepted as physical-page semantics.",
+    "Preflight policy and container proposals are explicitly spike probes, not completed product adapters.",
+    "No product sources, baseline dependencies or standard release workflow were modified. No production composition or independent acceptance is claimed."
+  ],
+  "file_index": {
+    "local-source.json": {
+      "bytes": 31025,
+      "sha256": "f9628563865a0dcfc031667766936081395c66c3f2359927b1525727ae139fba",
+      "original_path": ".build-spike03/local-04/source/report.json"
+    },
+    "local-frozen.json": {
+      "bytes": 31056,
+      "sha256": "625b323a9e83f5182e0ccc0bfbe720b177fba8ae7a1f5c25afcbe174682e1c65",
+      "original_path": ".build-spike03/local-04/frozen/report.json"
+    },
+    "local-build.json": {
+      "bytes": 410,
+      "sha256": "20506dcf8e216aba6dd3afd61584656d0a327d1ac06b3ac9593705a476ac8fb5",
+      "original_path": ".build-spike03/local-04/bundle/build-summary.json"
+    },
+    "local-build-metadata.json": {
+      "bytes": 286720,
+      "sha256": "411be202965b29944e83950e0e71505048a915b683ca7313d3a8703d3f822926",
+      "original_path": ".build-spike03/local-04/bundle/dist/RectoFlowSpike03/SPIKE_BUILD_METADATA.json"
+    },
+    "local-wheels.json": {
+      "bytes": 21705,
+      "sha256": "81daa659a7999b7ee153a37931c74e1e431fa2773555faded0da447dd6ab4840",
+      "original_path": ".build-spike03/local-01/prepared/wheel-inventory.json"
+    },
+    "hosted-source-311.json": {
+      "bytes": 31037,
+      "sha256": "2a826862fa1e1b666aec6f6cd787fedb358ff76af565d7d73dff319baf54d0f5",
+      "original_path": ".build-spike03/hosted-606/spike03-3.11/source/report.json"
+    },
+    "hosted-source-312.json": {
+      "bytes": 31059,
+      "sha256": "b214daa0ae574db5a44ae5e4703c2601c2c2768040f5dad7e9cc1926f60b17a9",
+      "original_path": ".build-spike03/hosted-606/spike03-3.12/source/report.json"
+    },
+    "hosted-frozen-312.json": {
+      "bytes": 31054,
+      "sha256": "19db1ffed77f8dde790698aa9fb90a303433924ad32f93ed16d560029b79e1f6",
+      "original_path": ".build-spike03/hosted-606/spike03-3.12/frozen/report.json"
+    },
+    "hosted-wheels-311.json": {
+      "bytes": 21705,
+      "sha256": "e82414b01778373c20455799182be2f151deb49871688556336074c6bf53eb48",
+      "original_path": ".build-spike03/hosted-606/spike03-3.11/prepared/wheel-inventory.json"
+    },
+    "hosted-wheels-312.json": {
+      "bytes": 21705,
+      "sha256": "81daa659a7999b7ee153a37931c74e1e431fa2773555faded0da447dd6ab4840",
+      "original_path": ".build-spike03/hosted-606/spike03-3.12/prepared/wheel-inventory.json"
+    },
+    "hosted-build.json": {
+      "bytes": 408,
+      "sha256": "9a50df16e3f5239f6a126789318c3e0185dd39611d0ba44dcdece9b3fbbbdcfd",
+      "original_path": ".build-spike03/hosted-606/spike03-3.12/bundle/build-summary.json"
+    },
+    "hosted-build-metadata.json": {
+      "bytes": 286719,
+      "sha256": "a648b4f5b19e0c1fae72e1e71dcb1702797cb5642da05e84d3ee4aa934652936",
+      "original_path": ".build-spike03/hosted-606/spike03-3.12/bundle/dist/RectoFlowSpike03/SPIKE_BUILD_METADATA.json"
+    },
+    "hosted-artifact-audit.json": {
+      "bytes": 2236,
+      "sha256": "a7627faae44e5d89ef31431cdf0178bc18843bd8dd215d2b0adde5b1e078f8d8",
+      "original_path": ".build-spike03/hosted-606/audit.json"
+    },
+    "hosted-run.json": {
+      "bytes": 13215,
+      "sha256": "d41006aa10bc4263c261d5fe3c4c2f414bfd65c207f6beb5b3c6df8dabe440e3",
+      "original_path": ".build-spike03/hosted-606/run.json"
+    },
+    "hosted-jobs.json": {
+      "bytes": 6422,
+      "sha256": "29483b180cf1caed8631531080ac89350056d36f51ec4654ad05c501332d2ac0",
+      "original_path": ".build-spike03/hosted-606/jobs.json"
+    },
+    "historical-local-8143e10f.json": {
+      "bytes": 23234,
+      "sha256": "abd9cf657dbb9ed83edaeabfa5f5168d50d237ec4c4fa4b016871c02faee3dbd",
+      "original_path": ".build-spike03/local-01/source/report.json"
+    },
+    "historical-local-65eb5262.json": {
+      "bytes": 27504,
+      "sha256": "e054c8ffbf2709de5f397ecfb2668bfb1178454f4a2f7cf5decaf57d58750d39",
+      "original_path": ".build-spike03/local-02/source/report.json"
+    },
+    "historical-local-e5a11679.json": {
+      "bytes": 27607,
+      "sha256": "6d2e041cb2c0d844ce2a694d64289074a6ab5e880c4e59e67dcfed8298e72316",
+      "original_path": ".build-spike03/local-03/source/report.json"
+    }
+  },
+  "commands": [
+    "python scripts/spike03/prepare.py .build-spike03/local-01/prepared",
+    "python scripts/spike03/harness.py --output .build-spike03/local-04/source",
+    "python scripts/spike03/build.py .build-spike03/local-04/bundle .build-spike03/local-01/prepared",
+    "python scripts/spike03/harness.py --output .build-spike03/local-04/frozen --exe .build-spike03/local-04/bundle/relocated/RectoFlowSpike03/RectoFlowSpike03.exe",
+    "python -B -m unittest discover -s tests -p 'test_*.py' -v",
+    "gh run view37670215300 --log; download raw artifact ZIP via gh api, verify API digest then every package member/hash and git subject/source hash"
+  ],
+  "no_independent_review_or_acceptance": true,
+  "no_product_ingestion_or_merge_or_release": true,
+  "provider_limitations": [
+    {
+      "id": "Q03-GEOMETRY-001",
+      "requirement": "Preserve the documented canvas-unit policy; future physical-DPI claims require additional policy/qualification",
+      "gap": "pypdfium2 render/get_size use canvas units; UserUnit=2 fixture produces400x200 at scale1, not a physical DPI guarantee. Provider docstring says PDFium does not expose UserUnit. No parser/rejection/adjustment path has been qualified.",
+      "action": "Keep render scale in canvas units explicit. A future physical-DPI implementation must either qualify UserUnit handling or visibly refuse unsupported physical conversion. Existing canvas-only qualification is not invalidated.",
+      "classification": "PROVIDER_LIMITATION_NOT_A_NEW_ACCEPTANCE_BLOCKER"
+    }
+  ]
+}
