@@ -128,10 +128,12 @@ def worker(request):
         assert error<.001 and mae<5,(error,mae)
         rotated=cv.warpAffine(flat,cv.getRotationMatrix2D((width/2,height/2),7,1),(width,height),borderValue=(255,255,255))
         def angle(image):
-            lines=cv.HoughLinesP(cv.Canny(cv.cvtColor(image,cv.COLOR_RGB2GRAY),40,100),1,np.pi/1800,70,minLineLength=250,maxLineGap=15)
+            # Near-horizontal resampled lines can fragment below HoughLinesP's
+            # minimum segment length. Standard Hough votes retain those edges.
+            lines=cv.HoughLines(cv.Canny(cv.cvtColor(image,cv.COLOR_RGB2GRAY),40,100),1,np.pi/1800,180)
             assert lines is not None
-            assert lines.size % 4 == 0
-            values=[math.degrees(math.atan2(int(y2)-int(y1),int(x2)-int(x1))) for x1,y1,x2,y2 in lines.reshape(-1,4)]
+            assert lines.size % 2 == 0
+            values=[math.degrees(float(theta))-90 for rho,theta in lines.reshape(-1,2)]
             values=[a for a in values if abs(a)<15];assert values
             return float(np.median(values))
         measured=angle(rotated)
