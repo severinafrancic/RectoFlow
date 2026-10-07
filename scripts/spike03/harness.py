@@ -111,6 +111,35 @@ def worker(request):
             with Image.open(BytesIO(Path(request['path']).read_bytes())) as im:im.load()
         except (OSError,ValueError) as e:return {'refused':True,'error_class':type(e).__name__}
         raise AssertionError('Corrupt image accepted')
+    if mode=='image_limit':
+        raw=Path(request['path']).read_bytes()
+        with Image.open(BytesIO(raw)) as image:
+            assert image.width*image.height>64_000_000 or max(image.size)>12000
+            return {'refused_before_load':True,'size_px':list(image.size),'scope':'spike preflight policy probe'}
+    if mode=='pdf_limit':
+        raw=Path(request['path']).read_bytes()
+        with pdf.PdfDocument(raw) as document:
+            if len(document)>500:return {'refused_before_render':True,'pages':len(document),'scope':'spike preflight policy probe'}
+            page=document[0]
+            try:
+                width,height=page.get_size()
+                assert width*height>64_000_000 or max(width,height)>12000
+                return {'refused_before_render':True,'size_px_at_scale1':[width,height],'scope':'spike preflight policy probe'}
+            finally:page.close()
+    if mode=='partial_write':
+        import errno
+        target=Path(request['output']);temporary=target.with_suffix('.tmp')
+        assert not target.exists() and not temporary.exists()
+        try:
+            with temporary.open('xb') as stream:
+                stream.write(b'partial-owned-synthetic-output');stream.flush();os.fsync(stream.fileno())
+                raise OSError(errno.ENOSPC,'Injected own stream storage failure')
+            os.rename(temporary,target)
+        except OSError as error:
+            assert error.errno==errno.ENOSPC and not target.exists() and temporary.exists()
+            return {'final_not_published':True,'partial_bytes':temporary.stat().st_size,
+                    'scope':'fault injection; not proof of a real full disk or power loss'}
+        raise AssertionError('Partial output was published')
     if mode=='geometry':
         width,height=480,640
         flat=np.full((height,width,3),255,np.uint8)
@@ -154,8 +183,15 @@ def worker(request):
         dest=Path(request['output']);dest.parent.mkdir(parents=True,exist_ok=True)
         Image.fromarray(output).save(dest,format='PNG',compress_level=1)
         data=dest.read_bytes()
+        bound_hash=sha(data)
+        # Decode exactly these persisted bytes, not a reopened path.
+        with Image.open(BytesIO(data)) as decoded:
+            assert decoded.size==(width,height) and decoded.width*decoded.height<=64_000_000
+            decoded.load()
+            assert np.array_equal(np.asarray(decoded),output),'PNG roundtrip changed source pixels'
         return {'megapixels_requested':mp,'size_px':[width,height],'decoded_pixels':width*height,
-                'output_bytes':len(data),'sha256':sha(data),'provider_seconds':time.perf_counter()-started}
+                'output_bytes':len(data),'sha256':bound_hash,'same_bytes_decode_pixel_exact':True,
+                'provider_seconds':time.perf_counter()-started}
     raise ValueError('Unknown own spike case')
 
 def call(request,folder,timeout=60,memory=2*1024**3,cancel_after=None,exe=None):
@@ -186,6 +222,10 @@ def execute(output,exe=None,resources=True):
     case('pdf_corrupt',{'mode':'pdf_error','path':fixtures['bad_pdf']},lambda r:r['refused'])
     case('tiff_frames_container_policy',{'mode':'tiff','path':fixtures['tiff'],'sha256':fixtures['tiff_sha256']})
     case('image_corrupt',{'mode':'image_error','path':fixtures['bad_image']},lambda r:r['refused'])
+    case('image_giant_preflight',{'mode':'image_limit','path':fixtures['giant_image']},lambda r:r['refused_before_load'])
+    case('pdf_page_count_preflight',{'mode':'pdf_limit','path':fixtures['too_many_pdf']},lambda r:r['refused_before_render'])
+    case('pdf_giant_geometry_preflight',{'mode':'pdf_limit','path':fixtures['giant_pdf']},lambda r:r['refused_before_render'])
+    case('partial_write_not_published',{'mode':'partial_write','output':str(output/'must-not-exist.png')},lambda r:r['final_not_published'])
     case('perspective_deskew_goldens',{'mode':'geometry'})
     case('job_memory_limit',{'mode':'memory'},lambda r:r['memory_limit_triggered'],memory=128*1024**2)
     for name,kw in [('job_timeout',{'timeout':.5}),('job_cancel',{'timeout':10,'cancel_after':.5})]:

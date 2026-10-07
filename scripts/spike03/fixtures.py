@@ -3,6 +3,8 @@ from io import BytesIO
 import hashlib
 from pathlib import Path
 import secrets
+import struct
+import zlib
 
 def sha(raw):return hashlib.sha256(raw).hexdigest()
 
@@ -43,10 +45,21 @@ def create(folder):
     tiff=folder/'multiframe.tiff';frames[0].save(tiff,save_all=True,append_images=frames[1:])
     bad=folder/'corrupt.pdf';bad.write_bytes(b'%PDF-1.7\nnot a PDF document\n')
     image=folder/'corrupt.png';image.write_bytes(b'\x89PNG\r\n\x1a\nnot a PNG')
+    giant=folder/'giant-header.png'
+    def chunk(kind,data):return struct.pack('>I',len(data))+kind+data+struct.pack('>I',zlib.crc32(kind+data)&0xffffffff)
+    giant.write_bytes(b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',13000,6000,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(b''))+chunk(b'IEND',b''))
+    too_many=PdfWriter()
+    for _ in range(501):too_many.add_blank_page(width=10,height=10)
+    pages=folder/'501-pages.pdf'
+    with pages.open('wb') as stream:too_many.write(stream)
+    too_large=PdfWriter();too_large.add_blank_page(width=30000,height=20000)
+    oversized=folder/'giant-page.pdf'
+    with oversized.open('wb') as stream:too_large.write(stream)
     return {'pdf':str(path),'pdf_sha256':sha(plain),'encrypted':str(protected),
             'encrypted_sha256':sha(protected.read_bytes()),'password':password,
             'tiff':str(tiff),'tiff_sha256':sha(tiff.read_bytes()),
-            'bad_pdf':str(bad),'bad_image':str(image)}
+            'bad_pdf':str(bad),'bad_image':str(image),'giant_image':str(giant),
+            'too_many_pdf':str(pages),'giant_pdf':str(oversized)}
 
 def container_proposals(source_id,frame_id,raster_hash,size,additional=()):
     """Contract probe, not a production ingestion adapter or detector."""
