@@ -1,0 +1,2 @@
+# Evidence sidecars preserve actual producer bytes, including original newlines.
+*.json -text

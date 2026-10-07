@@ -27,6 +27,14 @@ This report and its sidecars are published in a **separate evidence commit**.
 Its HEAD is not substituted for the tested subject above. A documentation-only
 evidence commit does not cause an older test to become a test of that new SHA.
 
+Publication correction: Git normalized CRLF in JSON sidecars in the first
+evidence commit ef51cbd428d2c629c2702a078814a9b0cf3e934e. Those stored blobs did
+not match the original-byte digests in the evidence index. A follow-up evidence
+commit applies a folder-local `*.json -text` rule and republishes the retained
+original bytes. Every stored Git blob is then checked against that index. The
+first commit remains in history; it is not valid byte-preservation evidence.
+This correction changes evidence publication only, not the tested spike code.
+
 Compared with the base, the material subject adds only WORKFLOW_03, the isolated
 spike scripts/requirements and the dedicated qualification workflow. Product
 sources, existing dependency/build locks, browser/capture/export behavior and
