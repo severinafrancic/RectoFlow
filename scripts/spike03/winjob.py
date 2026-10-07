@@ -46,6 +46,7 @@ K.IsProcessInJob.argtypes=[W.HANDLE,W.HANDLE,C.POINTER(W.BOOL)]
 K.GetCurrentProcess.restype=W.HANDLE
 PS=C.WinDLL('psapi',use_last_error=True)
 PS.GetProcessMemoryInfo.argtypes=[W.HANDLE,C.POINTER(Memory),W.DWORD]
+K.QueryInformationJobObject.argtypes=[W.HANDLE,C.c_int,C.c_void_p,W.DWORD,C.c_void_p]
 
 def checked(value):
     if not value: raise C.WinError(C.get_last_error())
@@ -113,7 +114,14 @@ class Child:
         result={'pid':int(self.proc.pid),'exit_code':int(code.value),'termination':stopped,
                 'elapsed_seconds':time.perf_counter()-self.started,'peak_working_set_bytes':self.peak,
                 'assigned_before_resume':True,'stderr':err.decode(errors='replace')}
+        limit_info=Extended()
+        checked(K.QueryInformationJobObject(self.job,9,C.byref(limit_info),C.sizeof(limit_info),None))
+        result['job_peak_process_committed_bytes']=int(limit_info.peak_process)
+        result['job_peak_committed_bytes']=int(limit_info.peak_job)
+        result['launcher_peak_working_set_bytes']=result.pop('peak_working_set_bytes')
         result['response']=json.loads(out) if out else None
+        if result['response'] and 'worker_memory' in result['response']:
+            result['peak_working_set_bytes']=result['response']['worker_memory']['peak_working_set_bytes']
         return result
     def close(self):
         if self.job:K.CloseHandle(self.job);self.job=None
@@ -124,4 +132,10 @@ class Child:
     def __enter__(self):return self
     def __exit__(self,*args):self.close()
 
-def handle_for_owned_pid(pid):return checked(K.OpenProcess(0x100000,False,pid))
+def handle_for_owned_pid(pid,terminate=False):return checked(K.OpenProcess(0x100000 | (1 if terminate else 0),False,pid))
+
+def own_memory():
+    info=Memory();info.cb=C.sizeof(info)
+    checked(PS.GetProcessMemoryInfo(K.GetCurrentProcess(),C.byref(info),C.sizeof(info)))
+    return {'pid':os.getpid(),'peak_working_set_bytes':int(info.peak_working),
+            'peak_committed_bytes':int(info.peak_pagefile)}

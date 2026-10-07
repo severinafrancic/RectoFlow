@@ -40,7 +40,7 @@ def worker(request):
     assert winjob.in_job(),'Worker not assigned to a Job Object'
     mode=request['mode']
     if mode=='hang':
-        if request.get('ready'):save(request['ready'],{'pid':os.getpid(),'in_job':True})
+        if request.get('ready'):save(request['ready'],{'pid':os.getpid(),'owner_pid':request['owner_pid'],'in_job':True})
         time.sleep(120);return {}
     if mode=='crash':os._exit(17)
     if mode=='memory':
@@ -130,7 +130,8 @@ def worker(request):
         def angle(image):
             lines=cv.HoughLinesP(cv.Canny(cv.cvtColor(image,cv.COLOR_RGB2GRAY),40,100),1,np.pi/1800,70,minLineLength=250,maxLineGap=15)
             assert lines is not None
-            values=[math.degrees(math.atan2(int(y2)-int(y1),int(x2)-int(x1))) for x1,y1,x2,y2 in lines[:,0]]
+            assert lines.size % 4 == 0
+            values=[math.degrees(math.atan2(int(y2)-int(y1),int(x2)-int(x1))) for x1,y1,x2,y2 in lines.reshape(-1,4)]
             values=[a for a in values if abs(a)<15];assert values
             return float(np.median(values))
         measured=angle(rotated)
@@ -197,7 +198,7 @@ def execute(output,exe=None,resources=True):
         results.append({'case':'worker_crash_contained','status':'PASS',**result})
     except Exception as e:results.append({'case':'worker_crash_contained','status':'FAILED','error':str(e)})
     # Terminate only this own test parent; retain a handle to its own child to avoid PID reuse.
-    parent=None;childhandle=None
+    parent=None;childhandle=None;ownerhandle=None
     try:
         ready=output/'parent-death-ready.json'
         cmd=[str(exe),'--orphan-parent',str(ready)] if exe else ([sys.executable,'--orphan-parent',str(ready)] if getattr(sys,'frozen',False) else [sys.executable,str(Path(__file__).resolve()),'--orphan-parent',str(ready)])
@@ -210,14 +211,17 @@ def execute(output,exe=None,resources=True):
             if parent.poll() is not None:raise RuntimeError('Own parent failed before ready')
             if time.monotonic()>deadline:raise TimeoutError('Own parent did not become ready')
             time.sleep(.05)
-        pid=json.loads(ready.read_text())['pid'];childhandle=winjob.handle_for_owned_pid(pid)
-        parent.terminate();parent.wait(timeout=10)
+        ready_info=json.loads(ready.read_text());pid=ready_info['pid']
+        childhandle=winjob.handle_for_owned_pid(pid)
+        ownerhandle=winjob.handle_for_owned_pid(ready_info['owner_pid'],terminate=True)
+        winjob.checked(winjob.K.TerminateProcess(ownerhandle,93));parent.wait(timeout=10)
         assert winjob.K.WaitForSingleObject(childhandle,10000)==0,'Worker survived owner parent death'
         results.append({'case':'job_parent_death','status':'PASS','own_child_pid':pid})
     except Exception as e:results.append({'case':'job_parent_death','status':'FAILED','error':str(e)})
     finally:
         if parent and parent.poll() is None:parent.terminate();parent.wait(timeout=10)
         if childhandle:winjob.K.CloseHandle(childhandle)
+        if ownerhandle:winjob.K.CloseHandle(ownerhandle)
     if resources:
         for mp in (1,12,24,48,64):
             case(f'resource_{mp}MP',{'mode':'resource','megapixels':mp,'output':str(output/f'resource-{mp}MP.png')})
@@ -239,10 +243,11 @@ def main():
     if sys.argv[1:]==['--worker']:
         raw=sys.stdin.buffer.readline(16385);assert len(raw)<=16384
         result=worker(json.loads(raw))
+        result['worker_memory']=winjob.own_memory()
         print(json.dumps(result,allow_nan=False));return 0
     if len(sys.argv)>1 and sys.argv[1]=='--orphan-parent':
         ready=Path(sys.argv[2]).resolve()
-        with winjob.Child(command(),{'mode':'hang','ready':str(ready)},ready.parent):time.sleep(120)
+        with winjob.Child(command(),{'mode':'hang','ready':str(ready),'owner_pid':os.getpid()},ready.parent):time.sleep(120)
         return 0
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output',type=Path,required=True)
