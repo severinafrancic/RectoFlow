@@ -1,0 +1,47 @@
+name: RectoFlow 0.3 qualification spike
+on:
+  push:
+    branches: [feature/rectoflow-0.3-document-ingestion]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python }}
+          architecture: x64
+      - name: Download verify and install pinned actual wheels
+        run: python scripts/spike03/prepare.py .build-spike03/ci/prepared
+      - name: Source worker qualification
+        shell: pwsh
+        run: |
+          python scripts/spike03/harness.py --output .build-spike03/ci/source
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Baseline regression
+        run: python -B -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Build standalone provider worker bundle
+        if: matrix.python == '3.12'
+        run: python scripts/spike03/build.py .build-spike03/ci/bundle .build-spike03/ci/prepared
+      - name: Actual relocated frozen worker qualification
+        if: matrix.python == '3.12'
+        run: python scripts/spike03/harness.py --output .build-spike03/ci/frozen --exe .build-spike03/ci/bundle/relocated/RectoFlowSpike03/RectoFlowSpike03.exe
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: spike03-${{ matrix.python }}
+          path: |
+            .build-spike03/ci/source/report.json
+            .build-spike03/ci/frozen/report.json
+            .build-spike03/ci/prepared/wheel-inventory.json
+            .build-spike03/ci/bundle/build-summary.json
+            .build-spike03/ci/bundle/dist/RectoFlowSpike03/SPIKE_BUILD_METADATA.json
+            .build-spike03/ci/bundle/RectoFlowSpike03-windows-x64.zip
+          if-no-files-found: error
