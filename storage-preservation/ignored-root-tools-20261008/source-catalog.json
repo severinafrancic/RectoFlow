@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "purpose": "Raw authored historical tool preservation only; no execution, product acceptance or authority transition.",
+  "parent_commit": "9b0191fe8708388ac67f9a13495afbea5c193886",
+  "authored_scripts": [
+    {
+      "original_basename": ".build-close-boundary.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/0bf670d2521ecfc21875af7cf3ca776bbc7443e0/.build-close-boundary.py",
+      "blob_oid": "0bf670d2521ecfc21875af7cf3ca776bbc7443e0",
+      "bytes": 3762,
+      "sha256": "2260b3c2e959a170fd1702190c61a339847ebda14fa829ea103e0b129ba551cd"
+    },
+    {
+      "original_basename": ".build-closure-builder-report.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/e8a19dd27646762a76b21992085045dc47f8d677/.build-closure-builder-report.py",
+      "blob_oid": "e8a19dd27646762a76b21992085045dc47f8d677",
+      "bytes": 3858,
+      "sha256": "7b62c7b9af9642ab84ace48433cf24276eb980ca50afbddd764b0412f1ef068b"
+    },
+    {
+      "original_basename": ".build-closure-session.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/187b8d7a2f06913fa1bbc780ea92010813ed47e7/.build-closure-session.py",
+      "blob_oid": "187b8d7a2f06913fa1bbc780ea92010813ed47e7",
+      "bytes": 2218,
+      "sha256": "212c49a0d4d33b229a0db7c2118ad966c80a41284d3dc08cedafd92b224c5ae3"
+    },
+    {
+      "original_basename": ".build-collect-v02.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/1162bae08888b4488f627286a5d44fa996384efb/.build-collect-v02.py",
+      "blob_oid": "1162bae08888b4488f627286a5d44fa996384efb",
+      "bytes": 4346,
+      "sha256": "0f7edffc4c6c6cc53ecf2b5abcd6ecf9dac9772a18ef746bfe0d267ccd855a49"
+    },
+    {
+      "original_basename": ".build-delivery-docs.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/b1ee745932f3ca7effdad6e241b582edcc4ecd02/.build-delivery-docs.py",
+      "blob_oid": "b1ee745932f3ca7effdad6e241b582edcc4ecd02",
+      "bytes": 6073,
+      "sha256": "9f45f6ba0ec5e662222e9628ae2009bafbc22ff90040d575573bcb58c8e52e5e"
+    },
+    {
+      "original_basename": ".build-final-receipt.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/1db4783a65ab838a80728ca04e72cb71e704d1c4/.build-final-receipt.py",
+      "blob_oid": "1db4783a65ab838a80728ca04e72cb71e704d1c4",
+      "bytes": 14628,
+      "sha256": "46b58cbbb14c85bf0f8a6c2d4357ecf3743ab083a1705cd96dd42d09bb2b4475"
+    },
+    {
+      "original_basename": ".build-pdf-qa.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/a2bbdb94da6009011661a640b664e47eb6811074/.build-pdf-qa.py",
+      "blob_oid": "a2bbdb94da6009011661a640b664e47eb6811074",
+      "bytes": 2584,
+      "sha256": "b26bf37c679612d5bba2131f3b0fcaf4e07c096b61c1c53e07eef6e57f3948cb"
+    },
+    {
+      "original_basename": ".build-prepare-rc1.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/95b4c069ad9db25caec5d8140f1bf8833c484e53/.build-prepare-rc1.py",
+      "blob_oid": "95b4c069ad9db25caec5d8140f1bf8833c484e53",
+      "bytes": 11835,
+      "sha256": "5e713b123d16987e5b917c3ff22c76db3139bc72990d32bcf783021f12828c8f"
+    },
+    {
+      "original_basename": ".build-preserve-closure.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/7a8baeeb175cd3ea142f51b8b55a8ff783809cfb/.build-preserve-closure.py",
+      "blob_oid": "7a8baeeb175cd3ea142f51b8b55a8ff783809cfb",
+      "bytes": 4047,
+      "sha256": "f19c80e5b742ed7ea60ba12275623a4c0d76e1261560325e857e561f27775495"
+    },
+    {
+      "original_basename": ".build-preserve-e762.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/41e0a8fc051456acd41580f18fbf5806c6cdfa19/.build-preserve-e762.py",
+      "blob_oid": "41e0a8fc051456acd41580f18fbf5806c6cdfa19",
+      "bytes": 3611,
+      "sha256": "50b4858965d53cd7ee3e513afdc8774ebd8543f22d68ebed1514b4f154adba9d"
+    },
+    {
+      "original_basename": ".build-preserve-edge-live-20261006.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/8413729bad00a4657141542a21d4f79d651dc149/.build-preserve-edge-live-20261006.py",
+      "blob_oid": "8413729bad00a4657141542a21d4f79d651dc149",
+      "bytes": 4827,
+      "sha256": "88c4e47128efa34f00d5d6ada770913f79083b1105dc20a2ef2bd777af0b052f"
+    },
+    {
+      "original_basename": ".build-preserve-live-fbr.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/716c443c854b69ada0836ec3e74b74c8191ff59b/.build-preserve-live-fbr.py",
+      "blob_oid": "716c443c854b69ada0836ec3e74b74c8191ff59b",
+      "bytes": 2893,
+      "sha256": "f6dfe6bf277f64371e49d88bd07f3d23a6115e849c2917b9b9b0116a496b8e8b"
+    },
+    {
+      "original_basename": ".build-preserve-review.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/54a001dc47d3adfb3eb9bd58811bac5a881f9bc0/.build-preserve-review.py",
+      "blob_oid": "54a001dc47d3adfb3eb9bd58811bac5a881f9bc0",
+      "bytes": 2160,
+      "sha256": "26419913fb8ce62de08ec88acd6290d4750fabdc3a04ec93c79646f996fef75d"
+    },
+    {
+      "original_basename": ".build-publish-v020.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/ebedc44acd3c739176f00a148c0713a31412d44e/.build-publish-v020.py",
+      "blob_oid": "ebedc44acd3c739176f00a148c0713a31412d44e",
+      "bytes": 11352,
+      "sha256": "9d0f6b379375f62cb37983061a199169b7b1ac4871e482131ea444adca76c4dc"
+    },
+    {
+      "original_basename": ".build-verify-published-rc1.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/c14dced6981713ebd5175656877a8b8a5a76580a/.build-verify-published-rc1.py",
+      "blob_oid": "c14dced6981713ebd5175656877a8b8a5a76580a",
+      "bytes": 3307,
+      "sha256": "2818e325809ab2e37a9e73917371ade9d8f4b6c439e688775b36c82743f81444"
+    },
+    {
+      "original_basename": ".build-verify-v020-public.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/292877b770af88eebf24e59ea5e9fae52aefdafc/.build-verify-v020-public.py",
+      "blob_oid": "292877b770af88eebf24e59ea5e9fae52aefdafc",
+      "bytes": 3324,
+      "sha256": "3d933e1697fb458a8eec176b62181b6111d28ac31a9ed811ef197e7b646908bb"
+    },
+    {
+      "original_basename": ".build-visual-qa.py",
+      "preservation_path": "storage-preservation/ignored-root-tools-20261008/variants/6c5f938a2a21a86ffe4f96c0b47d099fa6b883b1/.build-visual-qa.py",
+      "blob_oid": "6c5f938a2a21a86ffe4f96c0b47d099fa6b883b1",
+      "bytes": 1500,
+      "sha256": "e6c2a4caf8fc8ff4532df66bd0146d45e40005e8a3674993fd26e33e522d2081"
+    }
+  ]
+}
