@@ -132,7 +132,7 @@ def calibration_asset(output):
         picker.window.geometry('1280x820+0+0'); banner(picker.window)
         picker.window.update(); picker.render(); picker.window.update()
         assert len(picker.handles(REGIONS[0])) == 8
-        assert picker.selector['values'] == ('Bereich 1', 'Bereich 2', 'Weiter-Button', 'Fortschritt')
+        assert picker.selector['values'] == ('Bereich 1', 'Bereich 2', 'Weiter-Button', 'Seitenwechsel erkennen (optional)')
         render_client(picker.window, output / NAMES[0])
         picker.cancel()
     finally:
