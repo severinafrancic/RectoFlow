@@ -3,6 +3,8 @@
 Dieses unveröffentlichte Paket enthält Capture-Start, Diagnostik, Region-Editor
 und HTML-Picker gemeinsam. Kein Release und keine unabhängige Abnahme.
 Subject SHA und Tree stehen in `BUILD_METADATA.json` neben der EXE.
+Nach den realen Owner-Findings zusätzlich [Owner-Retest A–G](OWNER_RETEST_PAGE_LAYOUT.md)
+ausführen; der bisherige Subject `cf35c771...` ist nur noch historische Evidence.
 
 ZIP vollständig in einen beschreibbaren lokalen Ordner entpacken. Die EXE braucht
 den gesamten Ordner inklusive `_internal`; nicht nur die EXE verschieben.
@@ -27,7 +29,9 @@ Alte Configs ohne bisherige Capture-Bestätigung erhalten keinen neuen Pflichtdi
    Handles und „Neu aufziehen“ dürfen es nicht verkleinern oder vergrößern.
 6. Im Canvas Pfeil drücken: 1 px. Shift+Pfeil: 10 px. Am Rand wird die Bewegung
    begrenzt; die Größe bleibt gleich. Eingaben im Gap-Feld sind keine Region-Bewegung.
-7. Entsperren und Ecke anklicken/ziehen. Danach Pfeile am aktiven Handle prüfen.
+7. Entsperren und Ecke anklicken/ziehen oder per Tab/Shift+Tab wählen.
+   Reihenfolge NW/N/NE/E/SE/S/SW/W/MOVE; der Magnifier bleibt am aktiven Handle.
+   Danach Pfeile am aktiven Handle prüfen.
    Resize muss wieder möglich sein.
 8. Ctrl+Z und Ctrl+Y bzw. Ctrl+Shift+Z für Move/Resize prüfen. Ein ganzer Drag
    ist ein Undo-Schritt. Lock ist editorlokal und wird nicht in Config geschrieben.

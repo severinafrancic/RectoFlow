@@ -98,7 +98,28 @@ def main():
         except subprocess.CalledProcessError:pass
         else:raise AssertionError("RUNNING was exported")
         assert (captured/"manifest.json").read_bytes()==interrupted_bytes
+        # The relocated binary consumes schema 4 itself, including sparse slots.
+        from calibration.page_layout import default_policy,resolve_view
+        sparse=folder/"sparse-saved-run";sparse.mkdir()
+        cfg["regions"]=cfg["regions"][:2];cfg["expected_spreads"]=4
+        cfg["page_layout_policy"]=default_policy(2);cfg["page_layout_policy"].update(first=[2],last=[1])
+        records=[]
+        for index in range(1,5):
+            slots,layout=resolve_view(cfg["page_layout_policy"],index,index==4)
+            records.append(core.save_pair(sparse,index,screen,cfg,slots,layout))
+        sparse_manifest={"schema":4,"status":"COMPLETE","finished":"2026-10-10T00:00:00Z","config":cfg,"pairs":records}
+        core.write_json(sparse/"manifest.json",sparse_manifest);original=(sparse/"manifest.json").read_bytes()
+        sparse_pdf=Path(run(exe,"--rebuild",sparse).strip().splitlines()[-1])
+        pages=PdfReader(sparse_pdf).pages;assert len(pages)==6 and len(list(sparse.glob("*.png")))==6
+        entries=[entry for record in records for entry in record["images"]]
+        for page,entry in zip(pages,entries):
+            with Image.open(sparse/entry["file"]) as source:
+                assert page.images[0].image.convert("RGB").tobytes()==source.convert("RGB").tobytes()
+        assert (sparse/"manifest.json").read_bytes()==original
+        assert not (sparse/"000001_region_001.png").exists() and not (sparse/"000004_region_002.png").exists()
+        assert json.loads((sparse_pdf.parent/"result.json").read_bytes())["source_manifest_sha256"]==core.sha256(sparse/"manifest.json")
         print("FROZEN_SMOKE_PASS: relocated Windows x64 EXE; clean PATH; Tcl/UIA/Pillow/ReportLab imports; version/help; 3 ordered pixel-exact A5 landscape pages; A4 spread; unchanged PNGs/manifest.")
+        print("FROZEN_SPARSE_SMOKE_PASS: schema 4; Right/Both/Both/Left; six pixel-exact PDF pages, six PNGs; immutable source and persisted export result.")
 
 
 if __name__=="__main__":main()

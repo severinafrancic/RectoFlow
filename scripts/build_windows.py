@@ -51,7 +51,8 @@ def main():
     tree=subprocess.run(["git","rev-parse","HEAD^{tree}"],cwd=ROOT,capture_output=True,text=True,check=True).stdout.strip()
     dirty=subprocess.run(["git","status","--porcelain"],cwd=ROOT,capture_output=True,text=True,check=True)
     if args.owner_test and dirty.stdout.strip():raise RuntimeError("Owner-test build requires a clean committed subject.")
-    dist=ROOT/".build-v021"/"owner-test" if args.owner_test else ROOT/".build-dist"
+    # Each subject has its own output: historical owner packages stay untouched.
+    dist=ROOT/".build-v021"/"owner-test"/revision if args.owner_test else ROOT/".build-dist"
     if args.owner_test and (dist/"RectoFlow").exists():
         raise RuntimeError("Owner-test bundle already exists. Preserve previous evidence before building a new subject.")
     arguments=[sys.executable,"-m","PyInstaller","--noconfirm","--onedir","--console","--name","RectoFlow",

@@ -40,12 +40,12 @@ def main():
         if result.returncode:raise RuntimeError(f"{name} failed; inspect {log}")
     try:
         run("full-regression","-m","unittest","discover","-s","tests","-p","test_*.py","-v")
-        for name in ("native_ui_smoke","native_review_smoke","native_editor_smoke"):
+        for name in ("native_ui_smoke","native_review_smoke","native_editor_smoke","native_owner_smoke"):
             run(name,"tests/"+name+".py")
         run("readme-assets","scripts/generate_readme_assets.py","--check")
         run("source-self-check","rectoflow.py","--self-check")
         run("owner-build","scripts/build_windows.py","--owner-test")
-        archive=ROOT/".build-v021"/"owner-test"/"RectoFlow-owner-test-windows-x64.zip"
+        archive=ROOT/".build-v021"/"owner-test"/subject/"RectoFlow-owner-test-windows-x64.zip"
         run("frozen-relocated-smoke","tests/frozen_smoke.py","--archive",str(archive))
         exe=archive.parent/"RectoFlow"/"RectoFlow.exe"
         receipt["artifacts"]={"zip":str(archive),"zip_sha256":hashlib.sha256(archive.read_bytes()).hexdigest(),
