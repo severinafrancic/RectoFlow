@@ -171,6 +171,22 @@ def align_rect(rect,reference,operation,bounds,gap=0):
     return result
 
 
+def adjacent_rect(rect, direction, bounds, gap=0):
+    if type(gap) is not int or gap < 0:
+        raise CalibrationError("INVALID_RECTANGLE", "Abstand muss eine nichtnegative ganze Pixelzahl sein.")
+    x,y,w,h=rect
+    offsets={"left":(-w-gap,0),"right":(w+gap,0),"up":(0,-h-gap),"down":(0,h+gap)}
+    if direction not in offsets:
+        raise CalibrationError("INVALID_RECTANGLE", "Unbekannte Nachbarrichtung.")
+    dx,dy=offsets[direction]
+    proposed=[x+dx,y+dy,w,h]
+    try:
+        validate_rect(proposed,bounds)
+    except CalibrationError as error:
+        raise CalibrationError("INVALID_RECTANGLE", "Nachbarbereich passt nicht in die Zielgrenzen. Groesse und Position bleiben unveraendert.") from error
+    return proposed
+
+
 def canvas_transform(image_size, canvas_size):
     scale = min(canvas_size[0] / image_size[0], canvas_size[1] / image_size[1])
     return scale, (canvas_size[0] - image_size[0] * scale) / 2, (canvas_size[1] - image_size[1] * scale) / 2

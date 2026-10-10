@@ -7,7 +7,7 @@ from PIL import ImageTk
 from .geometry import (CalibrationError, center, contains, canvas_transform,
                        to_screen, move_rect, resize_rect, new_rect, fit_aspect,
                        paper_ratio, validate_selection,resize_aspect,align_rect)
-from .geometry import magnifier_pixels, magnifier_position
+from .geometry import magnifier_pixels, magnifier_position, adjacent_rect
 from .regions import capture_names, NAVIGATION
 
 COLORS = {"LEFT":"#ff5252", "RIGHT":"#4ca6ff", "NEXT":"#41ef92", "PROGRESS":"#ffcf48"}
@@ -27,6 +27,10 @@ class RectanglePicker:
         self.locked = set()
         self.active_handle = None
         self.magnifier_point = None
+        self.undo_stack=[]
+        self.redo_stack=[]
+        self.drag_before=None
+        self.next_region_id=1
         self.window = tk.Toplevel(root)
         self.window.title("RectoFlow: Kontrollvorschau" if final else "RectoFlow: Bereiche auswaehlen")
         self.window.geometry(f"{image.width}x{image.height}+0+0")
@@ -38,6 +42,9 @@ class RectanglePicker:
         for key in ("Left", "Right", "Up", "Down"):
             self.window.bind("<"+key+">",self.key_move)
             self.window.bind("<Shift-"+key+">",self.key_move)
+        self.window.bind("<Control-z>",lambda e:self.history_key(e,False))
+        self.window.bind("<Control-y>",lambda e:self.history_key(e,True))
+        self.window.bind("<Control-Shift-Z>",lambda e:self.history_key(e,True))
         toolbar = ttk.Frame(self.window, padding=6)
         toolbar.pack(fill="x")
         self.selected_var=tk.StringVar(value=self.display_name(self.selected))
@@ -45,8 +52,8 @@ class RectanglePicker:
         self.selector.pack(side="left",padx=3)
         self.selector.bind("<<ComboboxSelected>>",lambda e:self.select(list(self.rects)[self.selector.current()]))
         ttk.Button(toolbar,text="+ Bereich",command=self.add_region).pack(side="left",padx=2)
-        ttk.Button(toolbar,text="Frueher",command=lambda:self.reorder(-1)).pack(side="left",padx=2)
-        ttk.Button(toolbar,text="Spaeter",command=lambda:self.reorder(1)).pack(side="left",padx=2)
+        ttk.Button(toolbar,text="↑",command=lambda:self.reorder(-1)).pack(side="left",padx=2)
+        ttk.Button(toolbar,text="↓",command=lambda:self.reorder(1)).pack(side="left",padx=2)
         ttk.Button(toolbar,text="Neu aufziehen",command=self.draw_new).pack(side="left",padx=3)
         ttk.Button(toolbar,text="Loeschen",command=self.delete).pack(side="left",padx=3)
         ttk.Button(toolbar,text="Klickpunkt setzen",command=self.set_point).pack(side="left",padx=3)
@@ -85,6 +92,11 @@ class RectanglePicker:
         self.gap=tk.StringVar(value="0");ttk.Entry(geometrybar,textvariable=self.gap,width=5).pack(side="left")
         for label,op in (("Links","left"),("Oben","top"),("Gleiche Groesse","size"),("Direkt rechts","right")):
             ttk.Button(geometrybar,text=label,command=lambda o=op:self.align_selected(o)).pack(side="left",padx=2)
+        adjacentbar=ttk.Frame(self.window,padding=6);adjacentbar.pack(fill="x")
+        for label,direction in (("+ Links","left"),("+ Rechts","right"),("+ Oben","up"),("+ Unten","down")):
+            ttk.Button(adjacentbar,text=label,command=lambda d=direction:self.add_adjacent(d)).pack(side="left",padx=3)
+        ttk.Button(adjacentbar,text="Rueckgaengig",command=self.undo).pack(side="left",padx=3)
+        ttk.Button(adjacentbar,text="Wiederholen",command=self.redo).pack(side="left",padx=3)
         footer = ttk.Frame(self.window,padding=6)
         footer.pack(side="bottom",fill="x")
         ttk.Button(footer,text=save_label or ("Bestaetigt speichern" if final else "Live-Vorschau"),command=self.accept).pack(side="right",padx=3)
@@ -93,14 +105,19 @@ class RectanglePicker:
             ttk.Button(footer,text="Neu kalibrieren",command=self.recalibrate).pack(side="right",padx=3)
         self.status = tk.StringVar()
         ttk.Label(footer,textvariable=self.status).pack(side="left")
-        self.canvas = tk.Canvas(self.window,background="#23262c",highlightthickness=0)
-        self.canvas.pack(fill="both",expand=True)
+        workspace=ttk.Frame(self.window);workspace.pack(fill="both",expand=True)
+        self.region_list=tk.Listbox(workspace,width=24,exportselection=False)
+        self.region_list.pack(side="left",fill="y")
+        self.region_list.bind("<<ListboxSelect>>",self.list_selected)
+        self.canvas = tk.Canvas(workspace,background="#23262c",highlightthickness=0)
+        self.canvas.pack(side="left",fill="both",expand=True)
         self.canvas.bind("<Configure>",lambda e:self.render())
         self.canvas.bind("<ButtonPress-1>",self.press)
         self.canvas.bind("<B1-Motion>",self.motion)
         self.canvas.bind("<ButtonRelease-1>",self.release)
         self.transform = (1,0,0)
         self.photo = None
+        self.refresh_selector()
         self.paper_changed()
         self.window.update_idletasks()
         self.window.focus_force()
@@ -113,9 +130,25 @@ class RectanglePicker:
             self.lock_var.set(name in self.locked)
         if hasattr(self,"selected_var"):
             self.selected_var.set(self.display_name(name))
+        if hasattr(self,"region_list"):
+            self.region_list.selection_clear(0,"end")
+            self.region_list.selection_set(list(self.rects).index(name))
+            self.region_list.see(list(self.rects).index(name))
         self.render()
 
+    def list_selected(self,event):
+        selected=self.region_list.curselection()
+        if selected:self.select(list(self.rects)[selected[0]])
+
     def refresh_selector(self):
+        if hasattr(self,"region_list"):
+            self.region_list.delete(0,"end")
+            names=capture_names(self.rects)
+            for name in self.rects:
+                label=f"{names.index(name)+1}. Bereich" if name in names else self.display_name(name)
+                self.region_list.insert("end",label+(" [fixiert]" if name in self.locked else ""))
+            if self.selected in self.rects:
+                self.region_list.selection_set(list(self.rects).index(self.selected))
         if hasattr(self,"selector"):
             self.selector.configure(values=[self.display_name(n) for n in self.rects])
         if hasattr(self,"reference"):
@@ -133,21 +166,27 @@ class RectanglePicker:
             ordered=[(f"REGION_{i:03d}",self.rects[name]) for i,name in enumerate(capture_names(self.rects),1)]
             old_selected=self.selected
             names=capture_names(self.rects)
+            self.locked={f"REGION_{names.index(n)+1:03d}" if n in names else n for n in getattr(self,"locked",set())}
             self.rects=dict(ordered+[(n,self.rects.get(n)) for n in ("NEXT","PROGRESS")])
             if old_selected in names:
                 self.selected=f"REGION_{names.index(old_selected)+1:03d}"
 
     def add_region(self):
+        before=self.snapshot()
         self.modernize()
-        index=1
-        while f"REGION_{index:03d}" in self.rects:
-            index+=1
-        name=f"REGION_{index:03d}"
+        name=self.new_id()
         self.rects={**{n:r for n,r in self.rects.items() if n not in ("NEXT","PROGRESS")},name:None,
                     "NEXT":self.rects.get("NEXT"),"PROGRESS":self.rects.get("PROGRESS")}
         self.refresh_selector()
         self.select(name)
         self.draw_new()
+        self.remember(before)
+
+    def new_id(self):
+        index=getattr(self,"next_region_id",1)
+        while f"REGION_{index:03d}" in self.rects:index+=1
+        self.next_region_id=index+1
+        return f"REGION_{index:03d}"
 
     def reorder(self,direction):
         if self.selected not in capture_names(self.rects):
@@ -156,10 +195,12 @@ class RectanglePicker:
         index=names.index(self.selected)
         destination=index+direction
         if 0<=destination<len(names):
+            before=self.snapshot()
             names[index],names[destination]=names[destination],names[index]
             self.rects={name:self.rects[name] for name in names+["NEXT","PROGRESS"]}
             self.refresh_selector()
             self.select(self.selected)
+            self.remember(before)
 
     def draw_new(self):
         if self.is_locked():
@@ -168,16 +209,23 @@ class RectanglePicker:
         self.render()
 
     def delete(self):
+        before=self.snapshot()
         if self.selected in capture_names(self.rects):
+            if len(capture_names(self.rects))==1:
+                messagebox.showwarning("Bereich behalten","Mindestens ein Aufnahmebereich muss erhalten bleiben.",parent=self.window)
+                return
             self.modernize()
+            self.locked.discard(self.selected)
             del self.rects[self.selected]
             self.refresh_selector()
             self.select(capture_names(self.rects)[0] if capture_names(self.rects) else "NEXT")
+            self.remember(before)
             return
         self.rects[self.selected] = None
         if self.selected == "NEXT":
             self.point = None
         self.render()
+        self.remember(before)
 
     def set_point(self):
         self.selected, self.mode = "NEXT", "point"
@@ -195,15 +243,46 @@ class RectanglePicker:
                 return
             proposed = fit_aspect(self.rects[self.selected],ratio,self.bounds)
             if messagebox.askyesno("Bereich anpassen",f"{self.rects[self.selected]} → {proposed}\nDiese Geometrie uebernehmen?",parent=self.window):
+                before=self.snapshot()
                 self.rects[self.selected] = proposed
+                self.remember(before)
             self.render()
         except CalibrationError as error:
             messagebox.showerror("Papierformat",str(error),parent=self.window)
 
     def duplicate_region(self):
         if self.selected not in capture_names(self.rects) or self.rects[self.selected] is None:return
-        original=copy.deepcopy(self.rects[self.selected])
-        self.add_region();self.rects[self.selected]=original;self.mode="edit";self.render()
+        for direction in ("right","down","left","up"):
+            try:
+                proposed=adjacent_rect(self.rects[self.selected],direction,self.bounds)
+            except CalibrationError:
+                continue
+            if proposed not in [self.rects[n] for n in capture_names(self.rects)]:
+                self.insert_region(proposed)
+                return
+        messagebox.showwarning("Duplizieren","Kein Platz fuer eine versetzte Kopie gleicher Groesse. Auswahl unveraendert.",parent=self.window)
+
+    def add_adjacent(self,direction):
+        if self.selected not in capture_names(self.rects) or self.rects[self.selected] is None:return
+        try:
+            proposed=adjacent_rect(self.rects[self.selected],direction,self.bounds,int(self.gap.get()))
+            if proposed in [self.rects[n] for n in capture_names(self.rects)]:
+                raise CalibrationError("INVALID_RECTANGLE","An dieser Position existiert bereits ein Bereich.")
+            self.insert_region(proposed)
+        except (ValueError,CalibrationError) as error:
+            messagebox.showwarning("Nachbarbereich unveraendert",str(error),parent=self.window)
+
+    def insert_region(self,rect):
+        before=self.snapshot()
+        self.modernize()
+        names=capture_names(self.rects)
+        name=self.new_id()
+        names.insert(names.index(self.selected)+1,name)
+        self.rects[name]=list(rect)
+        # Ordered mapping is the adapter to the persisted ordered rectangle list.
+        self.rects={n:self.rects[n] for n in names+["NEXT","PROGRESS"]}
+        self.refresh_selector();self.select(name)
+        self.remember(before)
 
     def align_selected(self,operation):
         if operation=="size" and self.is_locked():
@@ -214,7 +293,9 @@ class RectanglePicker:
             index=self.reference.current()
             if not 0<=index<len(names) or self.rects[names[index]] is None:return
             proposed=align_rect(self.rects[self.selected],self.rects[names[index]],operation,self.bounds,int(self.gap.get()))
+            before=self.snapshot()
             self.rects[self.selected]=proposed;self.render()
+            self.remember(before)
         except (ValueError,CalibrationError) as error:
             messagebox.showwarning("Geometrie unveraendert",str(error),parent=self.window)
 
@@ -257,6 +338,7 @@ class RectanglePicker:
         if self.rects.get(self.selected) is None:
             self.lock_var.set(False)
             return
+        before=self.snapshot()
         if self.lock_var.get():
             self.locked.add(self.selected)
         else:
@@ -264,7 +346,9 @@ class RectanglePicker:
         self.active_handle=None
         self.magnifier_point=None
         self.mode="edit"
+        self.refresh_selector()
         self.render()
+        self.remember(before)
 
     def render_magnifier(self,width,height):
         if self.magnifier_point is None:
@@ -292,6 +376,7 @@ class RectanglePicker:
         old=self.rects.get(self.selected)
         if old is None:
             return
+        before=self.snapshot()
         step=10 if event.state & 1 else 1
         dx,dy={"Left":(-step,0),"Right":(step,0),"Up":(0,-step),"Down":(0,step)}[event.keysym]
         handle=getattr(self,"active_handle",None) if not self.is_locked() else None
@@ -303,12 +388,47 @@ class RectanglePicker:
             if not self.point or not contains(rect,self.point):self.point=center(rect)
         self.magnifier_point=self.handles(rect)[handle] if handle else None
         self.render()
+        self.remember(before)
         return "break"
 
     def release(self,event):
         self.drag=None
+        if getattr(self,"drag_before",None) is not None:
+            self.remember(self.drag_before)
+            self.drag_before=None
         if self.active_handle is None:self.magnifier_point=None
         self.render()
+
+    def snapshot(self):
+        return copy.deepcopy((list(self.rects.items()),getattr(self,"point",None),self.selected,getattr(self,"locked",set())))
+
+    def remember(self,before):
+        if before==self.snapshot():return
+        if not hasattr(self,"undo_stack"):self.undo_stack=[];self.redo_stack=[]
+        self.undo_stack.append(before)
+        self.undo_stack=self.undo_stack[-100:]
+        self.redo_stack.clear()
+
+    def restore_state(self,state):
+        items,self.point,self.selected,self.locked=copy.deepcopy(state)
+        self.rects=dict(items)
+        self.drag=None;self.drag_before=None;self.active_handle=None;self.magnifier_point=None
+        self.refresh_selector();self.select(self.selected)
+
+    def undo(self):
+        if self.drag:return
+        if getattr(self,"undo_stack",[]):
+            self.redo_stack.append(self.snapshot());self.restore_state(self.undo_stack.pop())
+
+    def redo(self):
+        if self.drag:return
+        if getattr(self,"redo_stack",[]):
+            self.undo_stack.append(self.snapshot());self.restore_state(self.redo_stack.pop())
+
+    def history_key(self,event,redo):
+        if isinstance(event.widget,(tk.Entry,ttk.Entry,ttk.Combobox,tk.Text,tk.Spinbox,ttk.Spinbox)):return
+        self.redo() if redo else self.undo()
+        return "break"
 
     @staticmethod
     def handles(rect):
@@ -317,24 +437,31 @@ class RectanglePicker:
                 "se":(x+w,y+h),"s":(x+w/2,y+h),"sw":(x,y+h),"w":(x,y+h/2)}
 
     def press(self,event):
-        self.canvas.focus_set()
+        if hasattr(self,"canvas"):self.canvas.focus_set()
         p=to_screen((event.x,event.y),self.transform)
         if not self.bounds[0] <= p[0] < self.bounds[2] or not self.bounds[1] <= p[1] < self.bounds[3]:
             return
         rect=self.rects[self.selected]
         if self.mode == "point":
             if rect and contains(rect,p):
+                before=self.snapshot()
                 self.point=p
                 self.mode="edit"
                 self.render()
+                self.remember(before)
             return
         handle=None
         if rect and self.mode != "draw" and not self.is_locked():
             radius=8/self.transform[0]
             handle=next((name for name,pos in self.handles(rect).items() if abs(p[0]-pos[0])<=radius and abs(p[1]-pos[1])<=radius),None)
+        if not handle and self.mode!="draw":
+            hits=[n for n,r in self.rects.items() if r and contains(r,p)]
+            if hits and self.selected not in hits:
+                self.select(hits[-1]);rect=self.rects[self.selected]
         kind=handle or ("move" if rect and contains(rect,p) and self.mode!="draw" else "draw")
         if self.is_locked() and kind=="draw":
             return
+        self.drag_before=self.snapshot()
         self.active_handle=handle
         self.magnifier_point=p if kind=="draw" else self.handles(rect)[handle] if handle else None
         self.drag=(p,copy.deepcopy(rect),kind,copy.deepcopy(self.point))
