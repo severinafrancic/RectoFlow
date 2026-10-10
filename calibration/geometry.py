@@ -181,6 +181,33 @@ def to_screen(point, transform):
     return [round((point[0] - ox) / scale), round((point[1] - oy) / scale)]
 
 
+def magnifier_pixels(image, point, zoom=8, extent=21):
+    """Sample original physical pixels, including black padding at image edges."""
+    from PIL import Image
+    x, y = (round(v) for v in point)
+    half = extent // 2
+    crop = image.crop((x-half, y-half, x-half+extent, y-half+extent))
+    enlarged = crop.resize((extent*zoom, extent*zoom), Image.Resampling.NEAREST)
+    return enlarged, (half*zoom+zoom//2, half*zoom+zoom//2)
+
+
+def magnifier_position(point, canvas_size, panel_size=(184,210), offset=24):
+    """Prefer the opposite quadrant near an edge; never cover the active point."""
+    x, y = point
+    width, height = canvas_size
+    pw, ph = panel_size
+    candidates = ((x+offset,y+offset),(x-offset-pw,y+offset),
+                  (x+offset,y-offset-ph),(x-offset-pw,y-offset-ph))
+    for left, top in candidates:
+        if 0 <= left and 0 <= top and left+pw <= width and top+ph <= height:
+            return left, top
+    for left, top in candidates:
+        left, top = max(0,min(width-pw,left)),max(0,min(height-ph,top))
+        if not (left <= x <= left+pw and top <= y <= top+ph):
+            return left, top
+    return None  # a tiny canvas cannot safely display the loupe
+
+
 def measured_mapping(css_centers, screen_centers, dpr):
     """Drei sichtbar gemessene Marker: Browser-Chrome-Offset nie erraten."""
     if not finite_number(dpr) or not 0.25 <= dpr <= 8:

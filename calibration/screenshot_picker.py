@@ -7,6 +7,7 @@ from PIL import ImageTk
 from .geometry import (CalibrationError, center, contains, canvas_transform,
                        to_screen, move_rect, resize_rect, new_rect, fit_aspect,
                        paper_ratio, validate_selection,resize_aspect,align_rect)
+from .geometry import magnifier_pixels, magnifier_position
 from .regions import capture_names, NAVIGATION
 
 COLORS = {"LEFT":"#ff5252", "RIGHT":"#4ca6ff", "NEXT":"#41ef92", "PROGRESS":"#ffcf48"}
@@ -23,6 +24,9 @@ class RectanglePicker:
         self.selected = capture_names(self.rects)[0] if capture_names(self.rects) else "NEXT"
         self.mode = "edit"
         self.drag = None
+        self.locked = set()
+        self.active_handle = None
+        self.magnifier_point = None
         self.window = tk.Toplevel(root)
         self.window.title("RectoFlow: Kontrollvorschau" if final else "RectoFlow: Bereiche auswaehlen")
         self.window.geometry(f"{image.width}x{image.height}+0+0")
@@ -31,6 +35,9 @@ class RectanglePicker:
         self.window.bind("<Escape>", lambda e:self.cancel())
         self.window.bind("<Delete>", lambda e:self.delete())
         self.window.bind("<Return>", lambda e:self.accept())
+        for key in ("Left", "Right", "Up", "Down"):
+            self.window.bind("<"+key+">",self.key_move)
+            self.window.bind("<Shift-"+key+">",self.key_move)
         toolbar = ttk.Frame(self.window, padding=6)
         toolbar.pack(fill="x")
         self.selected_var=tk.StringVar(value=self.display_name(self.selected))
@@ -43,6 +50,8 @@ class RectanglePicker:
         ttk.Button(toolbar,text="Neu aufziehen",command=self.draw_new).pack(side="left",padx=3)
         ttk.Button(toolbar,text="Loeschen",command=self.delete).pack(side="left",padx=3)
         ttk.Button(toolbar,text="Klickpunkt setzen",command=self.set_point).pack(side="left",padx=3)
+        self.lock_var=tk.BooleanVar(value=False)
+        ttk.Checkbutton(toolbar,text="Groesse fixieren",variable=self.lock_var,command=self.toggle_lock).pack(side="left",padx=3)
         formatbar=ttk.Frame(self.window,padding=6)
         formatbar.pack(fill="x")
         ttk.Label(formatbar,text="Optionales Seitenverhaeltnis:").pack(side="left")
@@ -89,7 +98,7 @@ class RectanglePicker:
         self.canvas.bind("<Configure>",lambda e:self.render())
         self.canvas.bind("<ButtonPress-1>",self.press)
         self.canvas.bind("<B1-Motion>",self.motion)
-        self.canvas.bind("<ButtonRelease-1>",lambda e:setattr(self,"drag",None))
+        self.canvas.bind("<ButtonRelease-1>",self.release)
         self.transform = (1,0,0)
         self.photo = None
         self.paper_changed()
@@ -98,6 +107,10 @@ class RectanglePicker:
 
     def select(self,name):
         self.selected, self.mode = name, "edit"
+        self.active_handle = None
+        self.magnifier_point = None
+        if hasattr(self,"lock_var"):
+            self.lock_var.set(name in self.locked)
         if hasattr(self,"selected_var"):
             self.selected_var.set(self.display_name(name))
         self.render()
@@ -149,6 +162,8 @@ class RectanglePicker:
             self.select(self.selected)
 
     def draw_new(self):
+        if self.is_locked():
+            return
         self.mode = "draw"
         self.render()
 
@@ -172,6 +187,8 @@ class RectanglePicker:
         self.render()
 
     def fit_selected(self):
+        if self.is_locked():
+            return
         try:
             ratio = paper_ratio(self.paper.get(),self.orientation.get())
             if self.selected not in capture_names(self.rects) or self.rects[self.selected] is None:
@@ -189,6 +206,8 @@ class RectanglePicker:
         self.add_region();self.rects[self.selected]=original;self.mode="edit";self.render()
 
     def align_selected(self,operation):
+        if operation=="size" and self.is_locked():
+            return
         try:
             names=capture_names(self.rects)
             if self.selected not in names or self.rects[self.selected] is None:return
@@ -216,18 +235,80 @@ class RectanglePicker:
             l,t,r,b = ox+x*s,oy+y*s,ox+(x+w)*s,oy+(y+h)*s
             color = COLORS.get(name,["#ff5252","#4ca6ff","#e6a646","#c487ff"][capture_names(self.rects).index(name)%4] if name in capture_names(self.rects) else "white")
             self.canvas.create_rectangle(l,t,r,b,outline=color,width=3 if name==self.selected else 2)
-            label=f"{self.display_name(name)} [{x},{y},{w},{h}]"
+            label=f"{self.display_name(name)} [{x},{y},{w},{h}]"+(" FIXIERT" if name in getattr(self,"locked",set()) else "")
             self.canvas.create_rectangle(l,t,l+max(160,len(label)*8),t+23,fill="#111111",outline=color)
             self.canvas.create_text(l+5,t+3,text=label,fill=color,anchor="nw")
-            if name == self.selected:
-                for px,py in self.handles(rect).values():
+            if name == self.selected and not self.is_locked():
+                for handle,(px,py) in self.handles(rect).items():
                     cx,cy=ox+px*s,oy+py*s
-                    self.canvas.create_rectangle(cx-4,cy-4,cx+4,cy+4,fill=color,outline="#111")
+                    self.canvas.create_rectangle(cx-4,cy-4,cx+4,cy+4,fill="white" if handle==self.active_handle else color,outline="#111")
         if self.point:
             x,y=ox+self.point[0]*s,oy+self.point[1]*s
             self.canvas.create_line(x-9,y,x+9,y,fill=COLORS["NEXT"],width=2)
             self.canvas.create_line(x,y-9,x,y+9,fill=COLORS["NEXT"],width=2)
-        self.status.set(f"{self.display_name(self.selected)}: ziehen/8 Griffe | {self.paper.get()} | ESC = Abbrechen")
+        self.render_magnifier(width,height)
+        mode="Groesse fixiert: nur verschieben" if self.is_locked() else "ziehen/8 Griffe"
+        self.status.set(f"{self.display_name(self.selected)}: {mode} | Pfeil 1 px / Shift 10 px | ESC = Abbrechen")
+
+    def is_locked(self):
+        return self.selected in getattr(self,"locked",set())
+
+    def toggle_lock(self):
+        if self.rects.get(self.selected) is None:
+            self.lock_var.set(False)
+            return
+        if self.lock_var.get():
+            self.locked.add(self.selected)
+        else:
+            self.locked.discard(self.selected)
+        self.active_handle=None
+        self.magnifier_point=None
+        self.mode="edit"
+        self.render()
+
+    def render_magnifier(self,width,height):
+        if self.magnifier_point is None:
+            return
+        s,ox,oy=self.transform
+        x,y=self.magnifier_point
+        position=magnifier_position((ox+x*s,oy+y*s),(width,height))
+        if position is None:
+            return
+        left,top=position
+        pixels,crosshair=magnifier_pixels(self.image,(x,y))
+        self.loupe_photo=ImageTk.PhotoImage(pixels,master=self.window)
+        self.canvas.create_rectangle(left,top,left+184,top+210,fill="#111",outline="white",width=2)
+        self.canvas.create_image(left+8,top+8,image=self.loupe_photo,anchor="nw")
+        cx,cy=left+8+crosshair[0],top+8+crosshair[1]
+        for color,thickness in (("black",3),("white",1)):
+            self.canvas.create_line(cx-14,cy,cx+14,cy,fill=color,width=thickness)
+            self.canvas.create_line(cx,cy-14,cx,cy+14,fill=color,width=thickness)
+        text=f"8x | X {round(x)} Y {round(y)}\n{self.active_handle or 'Neue Ecke'}"
+        self.canvas.create_text(left+8,top+178,text=text,fill="white",anchor="nw")
+
+    def key_move(self,event):
+        if isinstance(event.widget,(tk.Entry,ttk.Entry,ttk.Combobox,tk.Text,tk.Spinbox,ttk.Spinbox)):
+            return
+        old=self.rects.get(self.selected)
+        if old is None:
+            return
+        step=10 if event.state & 1 else 1
+        dx,dy={"Left":(-step,0),"Right":(step,0),"Up":(0,-step),"Down":(0,step)}[event.keysym]
+        handle=getattr(self,"active_handle",None) if not self.is_locked() else None
+        self.rects[self.selected]=resize_rect(old,handle,dx,dy,self.bounds) if handle else move_rect(old,dx,dy,self.bounds)
+        rect=self.rects[self.selected]
+        if self.selected=="NEXT":
+            if not handle and self.point:
+                self.point=[self.point[0]+rect[0]-old[0],self.point[1]+rect[1]-old[1]]
+            if not self.point or not contains(rect,self.point):self.point=center(rect)
+        self.magnifier_point=self.handles(rect)[handle] if handle else None
+        self.render()
+        return "break"
+
+    def release(self,event):
+        self.drag=None
+        if self.active_handle is None:self.magnifier_point=None
+        self.render()
 
     @staticmethod
     def handles(rect):
@@ -236,6 +317,7 @@ class RectanglePicker:
                 "se":(x+w,y+h),"s":(x+w/2,y+h),"sw":(x,y+h),"w":(x,y+h/2)}
 
     def press(self,event):
+        self.canvas.focus_set()
         p=to_screen((event.x,event.y),self.transform)
         if not self.bounds[0] <= p[0] < self.bounds[2] or not self.bounds[1] <= p[1] < self.bounds[3]:
             return
@@ -247,10 +329,14 @@ class RectanglePicker:
                 self.render()
             return
         handle=None
-        if rect and self.mode != "draw":
+        if rect and self.mode != "draw" and not self.is_locked():
             radius=8/self.transform[0]
             handle=next((name for name,pos in self.handles(rect).items() if abs(p[0]-pos[0])<=radius and abs(p[1]-pos[1])<=radius),None)
         kind=handle or ("move" if rect and contains(rect,p) and self.mode!="draw" else "draw")
+        if self.is_locked() and kind=="draw":
+            return
+        self.active_handle=handle
+        self.magnifier_point=p if kind=="draw" else self.handles(rect)[handle] if handle else None
         self.drag=(p,copy.deepcopy(rect),kind,copy.deepcopy(self.point))
         self.mode="edit"
         if kind=="draw":
@@ -265,6 +351,7 @@ class RectanglePicker:
         dx,dy=p[0]-start[0],p[1]-start[1]
         rect=new_rect(start,p,self.bounds) if kind=="draw" else move_rect(old,dx,dy,self.bounds) if kind=="move" else resize_rect(old,kind,dx,dy,self.bounds)
         self.rects[self.selected]=rect
+        self.magnifier_point=p if kind=="draw" else self.handles(rect)[kind] if kind!="move" else None
         if self.selected == "NEXT":
             shifted=[old_point[0]+rect[0]-old[0],old_point[1]+rect[1]-old[1]] if kind=="move" and old_point and old else None
             self.point=shifted if shifted and contains(rect,shifted) else center(rect)
