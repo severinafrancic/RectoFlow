@@ -90,5 +90,6 @@ def choose_window(gui):
         try: root.destroy()
         except tk.TclError: pass
     if result is None:
-        raise RuntimeError("Fensterwahl abgebrochen; keine Aufnahme gestartet.")
+        from .failures import UserCancelled
+        raise UserCancelled("Fensterwahl abgebrochen; keine Aufnahme gestartet.")
     return result

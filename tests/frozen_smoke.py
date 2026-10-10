@@ -53,6 +53,13 @@ def main():
         assert failed.returncode==2 and "STOPP:" in failed.stderr
         logs=list((exe.parent/"data"/"logs").glob("*.jsonl"))
         assert any(json.loads(p.read_text().splitlines()[-1])["phase"]=="CONFIG_LOAD" for p in logs)
+        attempts=list((exe.parent/"data"/"diagnostics"/"attempts").glob("*/attempt.json"))
+        failed_attempt=next(json.loads(p.read_bytes()) for p in attempts if json.loads(p.read_bytes()).get("exit_code")==2)
+        assert failed_attempt["primary_failure"]["code"]=="CFG_LOAD_FAILED"
+        assert failed_attempt["source_commit"]==subject and failed_attempt["source_tree"]==metadata["source_tree"]
+        assert failed_attempt["failed_checkpoint"]=="CONFIG_LOAD" and not failed_attempt["first_frame_acquired"]
+        assert not failed_attempt["run_created"] and not failed_attempt["manifest_created"]
+        assert all("first-frame.png" not in name and "/diagnostics/" not in name for name in z.namelist())
         assert "--rebuild" in run(exe,"--help")
         cfg=json.loads((ROOT/"config.json").read_text())
         cfg.update(regions=[[20,50,180,250],[240,50,200,210],[480,50,160,240]],navigation_mode="none",paper_format="A4")

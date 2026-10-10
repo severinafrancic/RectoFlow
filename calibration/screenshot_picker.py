@@ -1,4 +1,4 @@
-"""Lokaler Screenshot-Picker. Das Bild bleibt im RAM; Canvas ist nur Anzeige."""
+"""Lokaler Screenshot-Picker. Canvas is display; the private attempt owns evidence."""
 import copy
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -17,6 +17,7 @@ HANDLE_ORDER=("nw","n","ne","e","se","s","sw","w","MOVE")
 class RectanglePicker:
     def __init__(self, root, image, rects, point, bounds, paper="A4", orientation="portrait", final=False, save_label=None, navigation_mode="next_button"):
         self.root, self.image, self.bounds = root, image, bounds
+        self.final=final
         self.rects = copy.deepcopy(rects)
         self.rects.setdefault("NEXT",None)
         self.rects.setdefault("PROGRESS",None)
@@ -106,6 +107,7 @@ class RectanglePicker:
             ttk.Button(footer,text="Neu kalibrieren",command=self.recalibrate).pack(side="right",padx=3)
         self.status = tk.StringVar()
         ttk.Label(footer,textvariable=self.status).pack(side="left")
+        ttk.Label(self.window,text="Optional einen kleinen Bereich markieren, der sich beim Weiterblättern zuverlässig ändert, z. B. Seitenzahl oder Fortschrittsanzeige. Leer lassen = RectoFlow vergleicht die Aufnahmebereiche.",wraplength=900).pack(side="bottom",fill="x",padx=8)
         workspace=ttk.Frame(self.window);workspace.pack(fill="both",expand=True)
         self.region_list=tk.Listbox(workspace,width=24,exportselection=False)
         self.region_list.pack(side="left",fill="y")
@@ -168,7 +170,7 @@ class RectanglePicker:
 
     def display_name(self,name):
         if name=="NEXT":return "Weiter-Button"
-        if name=="PROGRESS":return "Fortschritt"
+        if name=="PROGRESS":return "Seitenwechsel erkennen (optional)"
         return f"Bereich {capture_names(self.rects).index(name)+1}"
 
     def modernize(self):
@@ -542,5 +544,9 @@ class RectanglePicker:
         self.window.destroy()
 
     def show(self):
+        if self.final:
+            from .diagnostics import checkpoint
+            self.window.update_idletasks()
+            checkpoint("FINAL_CONFIRMATION_SHOWN")
         self.root.wait_window(self.window)
         return self.result or {"action":"cancel"}

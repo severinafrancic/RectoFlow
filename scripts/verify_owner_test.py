@@ -39,6 +39,7 @@ def main():
         print(f"{name}: {'PASS' if result.returncode==0 else 'FAIL'}",flush=True)
         if result.returncode:raise RuntimeError(f"{name} failed; inspect {log}")
     try:
+        run("attempt-ledger-targeted","-m","unittest","discover","-s","tests","-p","test_attempt_ledger.py","-v")
         run("full-regression","-m","unittest","discover","-s","tests","-p","test_*.py","-v")
         for name in ("native_ui_smoke","native_review_smoke","native_editor_smoke","native_owner_smoke"):
             run(name,"tests/"+name+".py")

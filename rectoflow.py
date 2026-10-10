@@ -7,6 +7,7 @@ from tkinter import ttk, filedialog, messagebox, simpledialog
 
 import edge_capture as core
 from calibration.diagnostics import Diagnostic, current, scope
+from calibration.failures import boundary, UserCancelled
 
 
 def show_workflow_error(diagnostic, code):
@@ -166,27 +167,26 @@ def launcher():
         ttk.Button(buttons,text=title,command=lambda m=mode:run(m)).pack(fill="x",pady=4)
     root.mainloop()
     if not action:return 0
+    if current():current().phase("EXPORT" if action=="export" else "CONFIG_LOAD",mode=action.removeprefix("--"))
     if action=="export":
         dialog=tk.Tk()
         dialog.withdraw()
         try:
             name=filedialog.askopenfilename(title="manifest.json eines Aufnahmelaufs waehlen",filetypes=[("Aufnahmemanifest","manifest.json")],parent=dialog)
         finally:dialog.destroy()
-        if not name:return 0
+        if not name:raise UserCancelled("Export-Auswahl abgebrochen.")
         if current():current().phase("EXPORT",run_path=str(Path(name).parent))
         from calibration.pdf_export import export_dialog
         path=Path(name)
         from calibration.exports import running_state
-        state=running_state(path.parent)
-        if state not in ("COMPLETE","STOPPED","PDF_FAILED"):
-            if current():
-                current().phase("EXPORT", run_path=str(path.parent))
-                current().failure(ValueError(state+"\nOriginaldateien bleiben erhalten. Kein Resume in Version 0.2."))
-            return 2
-        result=export_dialog(path.parent,json.loads(path.read_text(encoding="utf-8")),core.build_pdf)
+        with boundary("EXPORT", "EXPORT_FAILED"):
+            state=running_state(path.parent)
+            if state not in ("COMPLETE","STOPPED","PDF_FAILED"):
+                raise ValueError(state+"\nOriginaldateien bleiben erhalten. Kein Resume in Version 0.2.")
+            result=export_dialog(path.parent,json.loads(path.read_text(encoding="utf-8")),core.build_pdf)
         if result:
             messagebox.showinfo("PDF fertig",f"Gespeichert:\n{path.parent/result['file']}")
-        return 0
+        return 2 if not result and current() and current().data["primary_failure"] else 0
     sys.argv=[sys.argv[0]]+(["--profile",profile_uuid] if profile_uuid else ["--config",selected.get()])+([] if action=="--capture" else [action])
     return graphical_core()
 

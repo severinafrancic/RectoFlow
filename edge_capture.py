@@ -26,7 +26,8 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 from calibration.geometry import right_rect, PAPER_MM, assert_same_selection, finite_number
 from calibration.regions import capture_rects, selection, image_names, navigation, browser_name
-from calibration.diagnostics import Diagnostic, current as current_diagnostic, scope as diagnostic_scope, phase, failure
+from calibration.diagnostics import Diagnostic, current as current_diagnostic, scope as diagnostic_scope, phase, failure, checkpoint, polling, first_snapshot_boundary
+from calibration.failures import StopRun, UserCancelled, boundary, instrument
 
 VERSION = "0.2.0"
 
@@ -38,14 +39,6 @@ def configure_console():
 
 def config_root():
     return Path(sys.executable).resolve().parent if getattr(sys,"frozen",False) else Path(__file__).resolve().parent
-
-
-class StopRun(RuntimeError):
-    """Unklarer Zustand oder Benutzerabbruch; niemals als Erfolg behandeln."""
-
-
-class UserCancelled(StopRun):
-    code = "USER_CANCELLED"
 
 
 def box(rect):
@@ -254,16 +247,18 @@ class WindowsGUI:
     def geometry(self):
         r = W.RECT()
         if not self.user.GetWindowRect(self.hwnd, ctypes.byref(r)):
-            raise ctypes.WinError(ctypes.get_last_error())
+            raise StopRun("Fenstergrenzen nicht pruefbar.","TARGET_ENVIRONMENT_CHANGED",guard="GetWindowRect") from ctypes.WinError(ctypes.get_last_error())
         return (r.left, r.top, r.right, r.bottom)
 
     def bind(self, check_config=True, check_calibration=True):
         from calibration.window_picker import choose_window, inspect_window
-        selected = choose_window(self)
+        with boundary("TARGET_PICK", "TARGET_SELECTION_FAILED"):
+            selected = choose_window(self)
+        checkpoint("TARGET_BIND_BEGIN")
         self.hwnd = selected["hwnd"]
         live = inspect_window(self,self.hwnd)
         if not live["ready"] or any(live[k]!=selected[k] for k in ("identity","exe","environment")):
-            raise StopRun("TARGET_WINDOW_LOST: Auswahl ist nicht mehr aktuell.")
+            raise StopRun("TARGET_WINDOW_LOST: Auswahl ist nicht mehr aktuell.", "TARGET_CHANGED", guard="selected_identity")
         self.browser = live["browser"]
         diagnostic = current_diagnostic()
         if diagnostic:
@@ -275,16 +270,17 @@ class WindowsGUI:
         self.bound_environment = live["environment"]
         self.window_property = "RectoFlow-" + uuid.uuid4().hex
         if not self.user.SetPropW(self.hwnd,self.window_property,W.HANDLE(1)):
-            raise StopRun("TARGET_WINDOW_LOST: Fenster-Lebensdauer nicht bindbar.")
+            raise StopRun("TARGET_WINDOW_LOST: Fenster-Lebensdauer nicht bindbar.", "TARGET_BIND_FAILED", guard="SetPropW")
         calibrated = self.cfg.get("calibration")
         if check_calibration and calibrated:
             if calibrated.get("coordinate_space") != "primary_screen_physical_pixels" or calibrated.get("schema") != 1:
-                raise StopRun("RECALIBRATION_REQUIRED: unbekanntes Kalibrierungsformat.")
+                raise StopRun("RECALIBRATION_REQUIRED: unbekanntes Kalibrierungsformat.", "TARGET_ENVIRONMENT_CHANGED", guard="calibration_schema")
             old = calibrated["target"]
             if any(old[key] != self.bound_environment[key] for key in ("window_bounds","screen_size","dpi","monitor")):
-                raise StopRun("RECALIBRATION_REQUIRED: Fenster, Monitor oder DPI weichen von der Kalibrierung ab.")
+                raise StopRun("RECALIBRATION_REQUIRED: Fenster, Monitor oder DPI weichen von der Kalibrierung ab.", "TARGET_ENVIRONMENT_CHANGED", guard="calibration_binding")
         self.activate_target()
         self.guard(areas=check_config)
+        checkpoint("TARGET_BIND_OK")
         print("Gebunden an",self.browser,":",self.title(),flush=True)
 
     def process_executable(self):
@@ -292,12 +288,12 @@ class WindowsGUI:
         self.user.GetWindowThreadProcessId(self.hwnd, ctypes.byref(pid))
         handle = self.kernel.OpenProcess(0x1000, False, pid.value)
         if not handle:
-            raise StopRun("Prozess des aktiven Fensters nicht pruefbar.")
+            raise StopRun("Prozess des aktiven Fensters nicht pruefbar.", "TARGET_CHANGED", guard="process_executable")
         try:
             exe = ctypes.create_unicode_buffer(32768)
             length = W.DWORD(len(exe))
             if not self.kernel.QueryFullProcessImageNameW(handle, 0, exe, ctypes.byref(length)):
-                raise ctypes.WinError(ctypes.get_last_error())
+                raise StopRun("Executable-Abfrage fehlgeschlagen.","TARGET_CHANGED",guard="QueryFullProcessImageNameW") from ctypes.WinError(ctypes.get_last_error())
         finally:
             self.kernel.CloseHandle(handle)
         return exe.value
@@ -307,11 +303,11 @@ class WindowsGUI:
         self.user.GetWindowThreadProcessId(self.hwnd,ctypes.byref(pid))
         handle = self.kernel.OpenProcess(0x1000,False,pid.value)
         if not handle:
-            raise StopRun("TARGET_WINDOW_LOST: Fensterprozess nicht mehr pruefbar.")
+            raise StopRun("TARGET_WINDOW_LOST: Fensterprozess nicht mehr pruefbar.", "TARGET_CHANGED", guard="process_identity")
         times = [W.FILETIME() for _ in range(4)]
         try:
             if not self.kernel.GetProcessTimes(handle,*(ctypes.byref(t) for t in times)):
-                raise ctypes.WinError(ctypes.get_last_error())
+                raise StopRun("Prozessidentitaets-Abfrage fehlgeschlagen.","TARGET_CHANGED",guard="GetProcessTimes") from ctypes.WinError(ctypes.get_last_error())
         finally:
             self.kernel.CloseHandle(handle)
         return [pid.value,(times[0].dwHighDateTime<<32)|times[0].dwLowDateTime]
@@ -324,10 +320,10 @@ class WindowsGUI:
         info.cbSize=ctypes.sizeof(info)
         self.user.GetMonitorInfoW.argtypes=[W.HANDLE,ctypes.POINTER(MonitorInfo)]
         if not self.user.GetMonitorInfoW(monitor,ctypes.byref(info)):
-            raise ctypes.WinError(ctypes.get_last_error())
+            raise StopRun("Monitor-Abfrage fehlgeschlagen.","TARGET_ENVIRONMENT_CHANGED",guard="GetMonitorInfoW") from ctypes.WinError(ctypes.get_last_error())
         dpi=self.user.GetDpiForWindow(self.hwnd)
         if not dpi:
-            raise StopRun("TARGET_WINDOW_LOST: Fenster-DPI ist unbekannt.")
+            raise StopRun("TARGET_WINDOW_LOST: Fenster-DPI ist unbekannt.", "TARGET_ENVIRONMENT_CHANGED", guard="dpi_unknown")
         r=info.rcMonitor
         return {"window_bounds":list(self.geometry()),"screen_size":list(self.size),"dpi":dpi,
                 "monitor":{"device":info.szDevice,"bounds":[r.left,r.top,r.right,r.bottom],"primary":bool(info.dwFlags&1)}}
@@ -341,7 +337,7 @@ class WindowsGUI:
 
     def activate_target(self, *, cleanup=False):
         if not self.user.IsWindow(self.hwnd) or self.process_identity()!=self.bound_identity:
-            raise StopRun("TARGET_WINDOW_LOST: Ziel-Fenster wurde geschlossen/ersetzt.")
+            raise StopRun("TARGET_WINDOW_LOST: Ziel-Fenster wurde geschlossen/ersetzt.", "TARGET_CHANGED", guard="window_identity")
         self.identity_environment_check()
         self.user.SetForegroundWindow(self.hwnd)
         self.pause(.3,check_abort=not cleanup)
@@ -349,17 +345,19 @@ class WindowsGUI:
 
     def identity_environment_check(self):
         if not self.user.IsWindow(self.hwnd):
-            raise StopRun("TARGET_WINDOW_LOST: Ziel geschlossen.")
+            raise StopRun("TARGET_WINDOW_LOST: Ziel geschlossen.", "TARGET_CHANGED", guard="IsWindow")
         if hasattr(self,"bound_identity") and self.process_identity()!=self.bound_identity:
-            raise StopRun("TARGET_WINDOW_LOST: Prozessidentitaet geaendert.")
+            raise StopRun("TARGET_WINDOW_LOST: Prozessidentitaet geaendert.", "TARGET_CHANGED", guard="process_identity")
         if hasattr(self,"bound_exe") and self.process_executable()!=self.bound_exe:
-            raise StopRun("TARGET_WINDOW_LOST: Executable geaendert.")
+            raise StopRun("TARGET_WINDOW_LOST: Executable geaendert.", "TARGET_CHANGED", guard="executable")
         if hasattr(self,"bound_exe") and (not self.user.IsWindowVisible(self.hwnd) or self.user.IsIconic(self.hwnd)):
-            raise StopRun("TARGET_WINDOW_LOST: Fenster ist nicht mehr sichtbar/bereit.")
+            raise StopRun("TARGET_WINDOW_LOST: Fenster ist nicht mehr sichtbar/bereit.", "TARGET_CHANGED", guard="visibility/minimized")
         if hasattr(self,"window_property") and not self.user.GetPropW(self.hwnd,self.window_property):
-            raise StopRun("TARGET_WINDOW_LOST: HWND-Lebensdauer geaendert.")
-        if hasattr(self,"bound_environment") and self.environment()!=self.bound_environment:
-            raise StopRun("RECALIBRATION_REQUIRED: Fenster, DPI oder Monitor geaendert.")
+            raise StopRun("TARGET_WINDOW_LOST: HWND-Lebensdauer geaendert.", "TARGET_CHANGED", guard="window_lifetime")
+        if hasattr(self,"bound_environment"):
+            observed=self.environment()
+            if observed!=self.bound_environment:
+                raise StopRun("RECALIBRATION_REQUIRED: Fenster, DPI oder Monitor geaendert.", "TARGET_ENVIRONMENT_CHANGED", guard="bound_environment",changed_fields=[key for key in observed if observed[key]!=self.bound_environment.get(key)])
 
     def __del__(self):
         # Property dies with HWND; remove our own live marker when this adapter closes.
@@ -378,21 +376,22 @@ class WindowsGUI:
         self.user.keybd_event(0x77,0,2,0)
         time.sleep(.1)
 
+    @instrument("TARGET_GUARD", "TARGET_BIND_FAILED")
     def guard(self, areas=True, *, check_abort=True):
         if check_abort:
             self.abort_check()
         self.identity_environment_check()
         if self.user.GetForegroundWindow() != self.hwnd:
-            raise StopRun("Zielbrowser hat den Fokus verloren. Keine weiteren Klicks.")
+            raise StopRun("Zielbrowser hat den Fokus verloren. Keine weiteren Klicks.", "TARGET_FOCUS_LOST", guard="foreground")
         if self.geometry() != self.initial_geometry or self.size != (self.user.GetSystemMetrics(0), self.user.GetSystemMetrics(1)):
-            raise StopRun("Fensterposition oder Bildschirmgroesse wurde geaendert.")
+            raise StopRun("Fensterposition oder Bildschirmgroesse wurde geaendert.", "TARGET_ENVIRONMENT_CHANGED", guard="window_bounds/screen_size")
         if hasattr(self,"bound_identity") and self.process_identity()!=self.bound_identity:
-            raise StopRun("TARGET_WINDOW_LOST: Fensterhandle/Prozessidentitaet wurde ersetzt.")
+            raise StopRun("TARGET_WINDOW_LOST: Fensterhandle/Prozessidentitaet wurde ersetzt.", "TARGET_CHANGED", guard="process_identity")
         if hasattr(self,"bound_environment") and self.environment()!=self.bound_environment:
-            raise StopRun("RECALIBRATION_REQUIRED: DPI oder Monitor wurden geaendert.")
+            raise StopRun("RECALIBRATION_REQUIRED: DPI oder Monitor wurden geaendert.", "TARGET_ENVIRONMENT_CHANGED", guard="dpi/monitor")
         required = self.cfg["window_title_contains"]
         if required and required.casefold() not in self.title().casefold():
-            raise StopRun("Fenstertitel passt nicht mehr zum gewaehlten Dokument.")
+            raise StopRun("Fenstertitel passt nicht mehr zum gewaehlten Dokument.", "TARGET_CHANGED", guard="title_match")
         # Stichproben gegen fremde Fenster ueber den relevanten Bereichen.
         if not areas:
             return
@@ -403,22 +402,32 @@ class WindowsGUI:
             for x, y in ((l, t), (rr - 1, t), (l, bb - 1), (rr - 1, bb - 1), ((l + rr) // 2, (t + bb) // 2)):
                 hit = self.user.WindowFromPoint(W.POINT(x, y))
                 if self.user.GetAncestor(hit, 2) != self.hwnd:
-                    raise StopRun("Aufnahmebereich/Button liegt ausserhalb des Zielbrowsers oder ist verdeckt.")
+                    raise StopRun("Aufnahmebereich/Button liegt ausserhalb des Zielbrowsers oder ist verdeckt.", "TARGET_OCCLUDED", guard="WindowFromPoint/root_ancestor")
 
     def park(self):
         self.guard()
         self.user.SetCursorPos(*self.cfg["park_point"])
 
     def snapshot(self, areas=True, *, check_abort=True):
+        with first_snapshot_boundary():
+            return self._snapshot(areas,check_abort=check_abort)
+
+    def _snapshot(self, areas=True, *, check_abort=True):
         from PIL import ImageGrab
-        self.guard(areas=areas,check_abort=check_abort)
-        try:
+        with boundary("TARGET_GUARD", "TARGET_BIND_FAILED"):
+            self.guard(areas=areas,check_abort=check_abort)
+        diagnostic=current_diagnostic()
+        first=diagnostic is not None and not diagnostic._first_requested
+        if first:
+            diagnostic._first_requested=True
+            checkpoint("FIRST_SCREENSHOT_REQUESTED")
+        with boundary("SCREENSHOT_ACQUIRE", "SCREENSHOT_ACQUIRE_FAILED"):
             image = ImageGrab.grab(bbox=(0, 0, *self.size), include_layered_windows=True).convert("RGB")
-        except Exception as error:
-            raise StopRun(f"SCREENSHOT_FAILED: {error}") from error
-        if image.size != self.size:
-            raise StopRun("SCREENSHOT_FAILED: Screenshot-Abmessungen passen nicht zum Hauptmonitor.")
-        self.guard(areas=areas,check_abort=check_abort)
+        if diagnostic:diagnostic.first_frame(image)
+        with boundary("FIRST_FRAME_GUARD" if first else "FRAME_GUARD", "PIXEL_GUARD_FAILED"):
+            if image.size != self.size:
+                raise StopRun("SCREENSHOT_FAILED: Screenshot-Abmessungen passen nicht zum Hauptmonitor.", "SCREENSHOT_DIMENSION_MISMATCH")
+            self.guard(areas=areas,check_abort=check_abort)
         return image
 
     def prepare_button(self):
@@ -432,12 +441,13 @@ class WindowsGUI:
             expected=tuple(self.cfg["button_rect"][2:])
             for attr, filename in (("enabled", "button_enabled.png"), ("disabled", "button_disabled.png")):
                 if not hasattr(self,"template_bytes") or filename not in self.template_bytes:
-                    raise StopRun("Button-Template-Snapshot fehlt; Lauf neu vorbereiten.")
+                    raise StopRun("Button-Template-Snapshot fehlt; Lauf neu vorbereiten.","BUTTON_PREPARE_FAILED")
                 setattr(self,attr,decode_template(self.template_bytes[filename],expected))
             if difference(self.enabled, self.disabled) < self.cfg["template_margin"] * 2:
                 raise ValueError("Aktive/inaktive Vorlage sind nicht deutlich unterscheidbar.")
 
     def button_state(self, image):
+        self.last_uia_error=None
         if navigation(self.cfg)!="next_button":
             return "disabled" if navigation(self.cfg)=="none" else "manual"
         if self.cfg["button_mode"] == "template":
@@ -469,15 +479,16 @@ class WindowsGUI:
 
     def click_next(self):
         if navigation(self.cfg)!="next_button":
-            raise StopRun("Keine automatischen Klicks in diesem Navigationsmodus.")
-        self.guard()
-        # Zustand kurz vor dem Klick erneut pruefen.
-        if self.button_state(self.snapshot()) != "enabled":
-            raise StopRun("Weiter ist unmittelbar vor dem Klick nicht sicher aktiv.")
-        x, y = self.cfg["next_point"]
-        if not self.user.SetCursorPos(x, y):
-            raise ctypes.WinError(ctypes.get_last_error())
-        self.guard()
+            raise StopRun("Keine automatischen Klicks in diesem Navigationsmodus.","NAVIGATION_CLICK_FAILED")
+        with boundary("NEXT_PRECLICK_GUARD", "NAVIGATION_PRECLICK_GUARD_FAILED"):
+            self.guard()
+            state=read_button(self,self.snapshot())
+            if state != "enabled":
+                raise StopRun("Weiter ist unmittelbar vor dem Klick nicht sicher aktiv.", "BUTTON_STATE_UNKNOWN" if state=="unknown" else "BUTTON_DISABLED")
+            x, y = self.cfg["next_point"]
+            if not self.user.SetCursorPos(x, y):
+                raise ctypes.WinError(ctypes.get_last_error())
+            self.guard()
         class MouseInput(ctypes.Structure):
             _fields_ = [("dx", W.LONG), ("dy", W.LONG), ("mouseData", W.DWORD),
                         ("dwFlags", W.DWORD), ("time", W.DWORD), ("dwExtraInfo", ctypes.c_size_t)]
@@ -495,12 +506,14 @@ class WindowsGUI:
         events[1].data.mi.dwFlags = 0x0004  # LEFTUP
         self.user.SendInput.argtypes = [W.UINT, ctypes.POINTER(Input), ctypes.c_int]
         self.user.SendInput.restype = W.UINT
-        inserted = self.user.SendInput(2, events, ctypes.sizeof(Input))
-        if inserted != 2:
-            if inserted == 1:
-                # Maus loslassen, aber den Weiter-Klick keinesfalls wiederholen.
-                self.user.SendInput(1, ctypes.pointer(events[1]), ctypes.sizeof(Input))
-            raise StopRun("Windows hat den Klick nicht vollstaendig angenommen. Kein Wiederholungsversuch.")
+        with boundary("NEXT_CLICK", "NAVIGATION_CLICK_FAILED"):
+            inserted = self.user.SendInput(2, events, ctypes.sizeof(Input))
+            checkpoint("NEXT_CLICK_SENT", inserted_events=inserted)
+            if inserted != 2:
+                if inserted == 1:
+                    # Maus loslassen, aber den Weiter-Klick keinesfalls wiederholen.
+                    self.user.SendInput(1, ctypes.pointer(events[1]), ctypes.sizeof(Input))
+                raise StopRun("Windows hat den Klick nicht vollstaendig angenommen. Kein Wiederholungsversuch.", "NAVIGATION_CLICK_FAILED", inserted_events=inserted)
         self.park()
 
     def manual_transition(self):
@@ -524,7 +537,29 @@ class WindowsGUI:
         return True
 
 
+def read_button(gui, image):
+    with boundary("BUTTON_STATE_READ", "BUTTON_STATE_UNKNOWN") as details:
+        state=gui.button_state(image)
+        details["state"]=state
+        cfg=getattr(gui,"cfg",{})
+        details["mode"]=cfg.get("button_mode") if isinstance(cfg,dict) else None
+        # Retain a sanitized original UIA error, never the private control label.
+        diagnostic=current_diagnostic()
+        cause=getattr(gui,"last_uia_error",None)
+        if isinstance(cause,str) and diagnostic:details["cause"]=diagnostic.redact(cause)
+        return state
+
+
 def wait_ready(gui, cfg, previous=None, clock=time.monotonic):
+    details=dict(poll_count=0,elapsed=0,change_detected=False,stable_detected=False,
+                 last_button_state=None,progress_difference=None,content_difference=None,
+                 content_change_detected=False,stability_content_difference=None)
+    with boundary("WAIT_NEW_VIEW", "VIEW_TRANSITION_TIMEOUT", **details) as aggregate:
+        with polling():
+            return _wait_ready(gui,cfg,previous,clock,aggregate)
+
+
+def _wait_ready(gui, cfg, previous, clock, aggregate):
     """Nur einen stabilen, gegenueber dem Ausgangsbild veraenderten Zustand liefern.
 
     previous ist das Fortschrittsbild VOR dem Klick. Ein Timeout fuehrt nie
@@ -534,14 +569,30 @@ def wait_ready(gui, cfg, previous=None, clock=time.monotonic):
     anchor = None
     state_anchor = None
     stable_since = started
+    fresh=previous is None
+    stable=False
+    dwell=cfg["stable_seconds"]
+    baseline=getattr(gui,"transition_content_baseline",None) if previous is not None else None
+    if not isinstance(baseline,Image.Image):baseline=None
     while clock() - started < cfg["timeout_seconds"]:
         image = gui.snapshot()
         content = content_image(image,cfg)
         progress = progress_image(image,cfg)
-        state = gui.button_state(image)
+        state = read_button(gui,image)
         now = clock()
         fresh = previous is None or difference(progress, previous) >= cfg["change_threshold"]
         stable = anchor is not None and difference(content, anchor[0]) <= cfg["stable_tolerance"] and difference(progress, anchor[1]) <= cfg["stable_tolerance"]
+        aggregate.update(poll_count=aggregate["poll_count"]+1,elapsed=now-started,
+                         change_detected=aggregate["change_detected"] or (previous is not None and fresh),
+                         stable_detected=stable,last_button_state=state,
+                         progress_difference=difference(progress,previous) if previous is not None else None,
+                         content_difference=difference(content,baseline) if baseline is not None else difference(content,anchor[0]) if anchor is not None else None,
+                         stability_content_difference=difference(content,anchor[0]) if anchor is not None else None)
+        if baseline is not None:
+            aggregate["content_change_detected"] |= aggregate["content_difference"]>=cfg["change_threshold"]
+        diagnostic=current_diagnostic()
+        if diagnostic and isinstance(getattr(gui,"last_uia_error",None),str):
+            aggregate["button_cause"]=diagnostic.redact(gui.last_uia_error)
         if not fresh or not stable or state != state_anchor or state == "unknown":
             anchor = (content, progress)
             state_anchor = state
@@ -552,8 +603,13 @@ def wait_ready(gui, cfg, previous=None, clock=time.monotonic):
             gui.guard()
             return image, state, progress
         gui.pause(cfg["poll_seconds"])
+    aggregate["elapsed"]=clock()-started
+    code=("BUTTON_STATE_UNKNOWN" if aggregate["last_button_state"]=="unknown" else
+          "VIEW_CHANGE_NOT_DETECTED" if previous is not None and not fresh else
+          "VIEW_NOT_STABLE" if anchor is not None and (not stable or clock()-stable_since<dwell) else
+          "VIEW_TRANSITION_TIMEOUT")
     raise StopRun("Zeitlimit: keine sicher neue, ruhige Ansicht mit bekanntem Button-Zustand. "
-                  "Kein erneuter Klick. progress_rect/Button-Erkennung pruefen.")
+                  "Kein erneuter Klick. Seitenwechsel-Erkennung/Button pruefen.",code,**aggregate)
 
 
 def save_pair(folder, index, screenshot, cfg, slots=None, layout=None):
@@ -566,9 +622,12 @@ def save_pair(folder, index, screenshot, cfg, slots=None, layout=None):
         if slot not in active:continue
         path = folder / filename
         tmp = path.with_suffix(".png.tmp")
-        screenshot.crop(box(rect)).save(tmp, format="PNG")
-        os.replace(tmp, path)
-        files.append({"file": filename, "sha256": sha256(path), **({"slot":slot} if slots is not None else {})})
+        with boundary("FIRST_CROP" if index==1 else "CROP", "CAPTURE_CROP_FAILED",slot=slot) as details:
+            screenshot.crop(box(rect)).save(tmp, format="PNG")
+            os.replace(tmp, path)
+            digest=sha256(path)
+            details.update(file=filename,sha256=digest,width=rect[2],height=rect[3])
+            files.append({"file": filename, "sha256": digest, **({"slot":slot} if slots is not None else {})})
     return {"index": index, "images": files, **({"slots":list(slots),"layout":layout} if slots is not None else {})}
 
 
@@ -579,7 +638,8 @@ def run_capture(gui, cfg, folder, manifest, confirmed_image=None):
     phase("FIRST_CAPTURE")
     image, state, progress = wait_ready(gui, cfg)
     if confirmed_image is not None:
-        assert_same_selection(confirmed_image,image,selection(cfg))
+        with boundary("SELECTION_GUARD", "PIXEL_GUARD_FAILED"):
+            assert_same_selection(confirmed_image,image,selection(cfg))
     for index in range(1, cfg["max_spreads"] + 1):
         # Unknown manual length: retain the current physical screenshot in memory
         # until the existing transition UI tells us whether it is the terminal view.
@@ -590,30 +650,38 @@ def run_capture(gui, cfg, folder, manifest, confirmed_image=None):
         is_last = index == cfg["expected_spreads"] if cfg["expected_spreads"] is not None else state == "disabled" or transition is False
         slots,layout = resolve_view(policy,index,is_last)
         # Nur komplett gespeicherte Paare ins Manifest aufnehmen.
-        manifest["pairs"].append(save_pair(folder, index, image, cfg,slots,layout) if sparse else save_pair(folder,index,image,cfg))
-        write_json(folder / "manifest.json", manifest)
+        pair=save_pair(folder, index, image, cfg,slots,layout) if sparse else save_pair(folder,index,image,cfg)
+        with boundary("FIRST_MANIFEST_APPEND" if index==1 else "MANIFEST_APPEND", "CAPTURE_MANIFEST_APPEND_FAILED"):
+            manifest["pairs"].append(pair)
+            write_json(folder / "manifest.json", manifest)
         phase("CAPTURE_LOOP", capture_count=len(manifest["pairs"]))
+        if index==1:checkpoint("CAPTURE_LOOP_ENTER")
         print(f"Ansicht {index}: {len(slots)} Bereiche gespeichert; Weiter={state}.", flush=True)
         if state == "disabled":
             if cfg["expected_spreads"] is not None and index != cfg["expected_spreads"]:
-                raise StopRun(f"Weiter deaktiviert nach {index} Ansichten; erwartet: {cfg['expected_spreads']}.")
+                raise StopRun(f"Weiter deaktiviert nach {index} Ansichten; erwartet: {cfg['expected_spreads']}.","BUTTON_DISABLED")
             return
         if navigation(cfg)=="manual":
             if not (gui.manual_transition() if transition is None else transition):
                 if cfg["expected_spreads"] is not None and index!=cfg["expected_spreads"]:
-                    raise StopRun("Manuell beendet vor der erwarteten Ansichtsanzahl.")
+                    raise StopRun("Manuell beendet vor der erwarteten Ansichtsanzahl.","CAPTURE_INCOMPLETE")
                 return
             if index==cfg["max_spreads"] or index==cfg["expected_spreads"]:
-                raise StopRun("Ansichtslimit erreicht.")
+                raise StopRun("Ansichtslimit erreicht.","CAPTURE_LIMIT_REACHED")
             image,state,progress=wait_ready(gui,cfg)
             continue
         if index == cfg["max_spreads"] or index == cfg["expected_spreads"]:
-            raise StopRun("Ansichtslimit erreicht, aber Weiter ist noch aktiv.")
+            raise StopRun("Ansichtslimit erreicht, aber Weiter ist noch aktiv.","CAPTURE_LIMIT_REACHED")
         # Ausgangsbild direkt vor dem Klick muss immer noch passen.
-        current = gui.snapshot()
-        if difference(content_image(current,cfg),content_image(image,cfg)) > cfg["stable_tolerance"] or difference(progress_image(current,cfg), progress) > cfg["stable_tolerance"]:
-            raise StopRun("Ansicht hat sich zwischen Speicherung und Klick veraendert.")
+        with boundary("NAVIGATION_CHECK", "SELECTION_GUARD_FAILED") as details:
+            current = gui.snapshot()
+            content_diff=difference(content_image(current,cfg),content_image(image,cfg))
+            progress_diff=difference(progress_image(current,cfg), progress)
+            details.update(content_difference=content_diff,progress_difference=progress_diff,threshold=cfg["stable_tolerance"],compared_region_count=len(capture_rects(cfg)))
+            if content_diff > cfg["stable_tolerance"] or progress_diff > cfg["stable_tolerance"]:
+                raise StopRun("Ansicht hat sich zwischen Speicherung und Klick veraendert.","SELECTION_GUARD_FAILED")
         gui.click_next()  # genau EIN Klick pro bestaetigtem Uebergang
+        gui.transition_content_baseline=content_image(current,cfg)
         image, state, progress = wait_ready(gui, cfg, previous=progress)
 
 
@@ -666,6 +734,9 @@ def main(diagnostic=None):
     with diagnostic_scope(diagnostic):
         try:
             return diagnostic.finish(_main())
+        except SystemExit as error:
+            diagnostic.finish(error.code if isinstance(error.code,int) else 2)
+            raise
         except (Exception, KeyboardInterrupt) as error:
             diagnostic.failure(error)
             diagnostic.finish(2)
@@ -677,13 +748,16 @@ def publish_run(output_root, manifest):
     identifier = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex
     folder = Path(output_root) / ("run_" + identifier)
     stage = Path(output_root) / (".pending-run_" + identifier)
-    phase("RUN_CREATE", run_path=str(folder))
-    stage.mkdir(parents=True, exist_ok=False)
+    phase("RUN_CREATE", run_path=str(folder),stage_path=str(stage))
+    with boundary("RUN_STAGE_CREATE", "RUN_CREATE_FAILED"):
+        stage.mkdir(parents=True, exist_ok=False)
     phase("MANIFEST_WRITE")
-    write_json(stage / "manifest.json", manifest)
+    with boundary("INITIAL_MANIFEST_WRITE", "MANIFEST_WRITE_FAILED"):
+        write_json(stage / "manifest.json", manifest)
     # Native Windows rename rejects an existing destination. Same volume publication.
-    os.rename(stage, folder)
-    phase("MANIFEST_WRITE", manifest_created=True)
+    with boundary("RUN_PUBLISH", "RUN_PUBLISH_FAILED"):
+        os.rename(stage, folder)
+        phase("MANIFEST_WRITE", manifest_created=True)
     return folder
 
 
@@ -706,48 +780,53 @@ def _main():
     if args.export_plan and (not args.rebuild or any((args.paper,args.orientation,args.layout))):
         parser.error("--export-plan erfordert --rebuild und darf nicht mit Format-Overrides kombiniert werden.")
     if args.rebuild:
-        phase("EXPORT", mode="rebuild", run_path=str(args.rebuild.resolve()))
-        folder = args.rebuild.resolve()
-        from calibration.exports import source_snapshot, create_plan, execute_plan
-        manifest,manifest_hash=source_snapshot(folder)
-        overrides={key:value for key,value in (("paper_format",args.paper),("paper_orientation",args.orientation),("pdf_layout",args.layout)) if value is not None}
-        if manifest.get("schema") in (3,4) or args.export_plan:
-            plan=args.export_plan or create_plan(folder,options=overrides,expected_manifest_hash=manifest_hash)
-            print(execute_plan(folder,plan))
+        with boundary("EXPORT", "EXPORT_FAILED"):
+            phase("EXPORT", mode="rebuild", run_path=str(args.rebuild.resolve()))
+            folder = args.rebuild.resolve()
+            from calibration.exports import source_snapshot, create_plan, execute_plan
+            manifest,manifest_hash=source_snapshot(folder)
+            overrides={key:value for key,value in (("paper_format",args.paper),("paper_orientation",args.orientation),("pdf_layout",args.layout)) if value is not None}
+            if manifest.get("schema") in (3,4) or args.export_plan:
+                plan=args.export_plan or create_plan(folder,options=overrides,expected_manifest_hash=manifest_hash)
+                print(execute_plan(folder,plan))
+                return 0
+            import copy
+            manifest=copy.deepcopy(manifest)
+            for key,value in (("paper_format",args.paper),("paper_orientation",args.orientation),("pdf_layout",args.layout)):
+                if value is not None:
+                    manifest["config"][key]=value
+            suffix = "" if manifest["status"] == "COMPLETE" else "_TEILSTAND"
+            output = folder / f"gesamt_neu{suffix}_{uuid.uuid4().hex[:8]}.pdf" if any((args.paper,args.orientation,args.layout)) else folder / f"gesamt_neu{suffix}.pdf"
+            if output.exists():
+                raise ValueError(f"Datei existiert bereits: {output}")
+            if not build_pdf(folder, manifest, output):
+                raise ValueError("Keine vollstaendigen Bildpaare vorhanden.")
+            print(output)
             return 0
-        import copy
-        manifest=copy.deepcopy(manifest)
-        for key,value in (("paper_format",args.paper),("paper_orientation",args.orientation),("pdf_layout",args.layout)):
-            if value is not None:
-                manifest["config"][key]=value
-        suffix = "" if manifest["status"] == "COMPLETE" else "_TEILSTAND"
-        output = folder / f"gesamt_neu{suffix}_{uuid.uuid4().hex[:8]}.pdf" if any((args.paper,args.orientation,args.layout)) else folder / f"gesamt_neu{suffix}.pdf"
-        if output.exists():
-            raise ValueError(f"Datei existiert bereits: {output}")
-        if not build_pdf(folder, manifest, output):
-            raise ValueError("Keine vollstaendigen Bildpaare vorhanden.")
-        print(output)
-        return 0
     if any((args.paper,args.orientation,args.layout)):
         parser.error("--paper/--orientation/--layout sind fuer --rebuild. Aufnahmeauswahl in --calibrate aendern.")
     profile_snapshot=None
     phase("CONFIG_LOAD", mode="calibrate" if args.calibrate else "preview" if args.preview else "position" if args.position else "capture")
-    if args.profile:
-        from calibration.profiles import ProfileStore
-        profile_snapshot=ProfileStore(config_root()/"data").snapshot(args.profile,include_templates=not bool(args.calibrate))
-        config_path=profile_snapshot["config_path"]
-        config_bytes=profile_snapshot["config_bytes"]
-        cfg=profile_snapshot["config"]
-    else:
-        from calibration.storage import config_transaction
-        config_path = args.config.resolve()
-        with config_transaction(config_path):
-            config_bytes = config_path.read_bytes()
-            cfg = json.loads(config_bytes.decode("utf-8-sig"))
-            template_bytes={name:(config_path.parent/name).read_bytes() for name in ("button_enabled.png","button_disabled.png")} if not args.calibrate and cfg["button_mode"]=="template" and navigation(cfg)=="next_button" else {}
+    with boundary("CONFIG_LOAD", "CFG_LOAD_FAILED"):
+        if args.profile:
+            from calibration.profiles import ProfileStore
+            profile_snapshot=ProfileStore(config_root()/"data").snapshot(args.profile,include_templates=not bool(args.calibrate))
+            config_path=profile_snapshot["config_path"]
+            config_bytes=profile_snapshot["config_bytes"]
+            cfg=profile_snapshot["config"]
+        else:
+            from calibration.storage import config_transaction
+            config_path = args.config.resolve()
+            with config_transaction(config_path):
+                config_bytes = config_path.read_bytes()
+                cfg = json.loads(config_bytes.decode("utf-8-sig"))
+                if not isinstance(cfg,dict):raise StopRun("Konfiguration muss ein JSON-Objekt sein.","CFG_INVALID")
+                template_bytes={name:(config_path.parent/name).read_bytes() for name in ("button_enabled.png","button_disabled.png")} if not args.calibrate and cfg.get("button_mode")=="template" and navigation(cfg)=="next_button" else {}
     if current_diagnostic():
-        current_diagnostic().private_values.add(cfg.get("window_title_contains", ""))
-    gui = WindowsGUI(cfg, config_path.parent)
+        for name in ("window_title_contains","button_name"):
+            if isinstance(cfg.get(name),str):current_diagnostic().private_values.add(cfg[name])
+    with boundary("TARGET_ADAPTER", "TARGET_BIND_FAILED"):
+        gui = WindowsGUI(cfg, config_path.parent)
     gui.template_bytes={"button_"+key+".png":data for key,data in profile_snapshot["templates"].items()} if profile_snapshot else template_bytes
     if args.calibrate == "interactive":
         phase("CALIBRATION")
@@ -761,9 +840,11 @@ def _main():
             print(f"x={p.x:5d} y={p.y:5d}", end="\r", flush=True)
             gui.pause(0.15)
     phase("VALIDATION")
-    validate(cfg, gui.size)
+    with boundary("CONFIG_VALIDATE", "CFG_INVALID"):
+        validate(cfg, gui.size)
     phase("TARGET_BINDING")
-    gui.bind()
+    with boundary("TARGET_BIND", "TARGET_BIND_FAILED"):
+        gui.bind()
     gui.park()
     gui.pause(0.5)
     if args.calibrate in ("enabled","disabled"):
@@ -795,15 +876,19 @@ def _main():
             draw.line((px-8,py,px+8,py),fill="lime",width=2)
             draw.line((px,py-8,px,py+8),fill="lime",width=2)
         image.save(folder / "vorschau.png")
-        gui.prepare_button()
-        state = gui.button_state(gui.snapshot())
+        with boundary("BUTTON_PREPARE", "BUTTON_PREPARE_FAILED"):
+            gui.prepare_button()
+        state = read_button(gui,gui.snapshot())
         print("Button-Zustand:", state, "; Vorschau:", folder / "vorschau.png")
-        return 0 if state != "unknown" else 2
+        if state == "unknown":
+            raise StopRun("Button-Zustand unbekannt.", "BUTTON_STATE_UNKNOWN")
+        return 0
     confirmed_image=None
     if "regions" in cfg or cfg.get("calibration",{}).get("requires_visual_confirmation"):
         phase("FINAL_CONFIRMATION")
         from calibration.calibration import confirm_capture
-        confirmed_image=confirm_capture(gui,cfg)
+        with boundary("FINAL_CONFIRMATION", "CONFIRMATION_FAILED", ok="FINAL_CONFIRMATION_ACCEPTED"):
+            confirmed_image=confirm_capture(gui,cfg)
     manifest = {"schema": 4 if "page_layout_policy" in cfg else 3, "version":VERSION,"status": "RUNNING", "reason": "", "pairs": [], "config": cfg,
                 "script_sha256": sha256(Path(__file__)), "started": datetime.now().astimezone().isoformat(),
                 "window_title": gui.title(), "screen_size": gui.size,
@@ -820,7 +905,8 @@ def _main():
     with exclusive(folder/".writer.lock"):
         try:
             phase("FIRST_CAPTURE")
-            gui.prepare_button()
+            with boundary("BUTTON_PREPARE", "BUTTON_PREPARE_FAILED"):
+                gui.prepare_button()
             run_capture(gui,cfg,folder,manifest,confirmed_image=confirmed_image)
             manifest["status"]="COMPLETE";exit_code=0
         except (Exception, KeyboardInterrupt) as error:
@@ -830,7 +916,8 @@ def _main():
         finally:
             manifest["finished"]=datetime.now().astimezone().isoformat()
             try:
-                write_json(folder/"manifest.json",manifest)
+                with boundary("FINAL_MANIFEST_WRITE", "MANIFEST_WRITE_FAILED"):
+                    write_json(folder/"manifest.json",manifest)
                 diagnostic=current_diagnostic()
                 if diagnostic:
                     diagnostic.data["capture_count"]=len(manifest["pairs"])
@@ -840,18 +927,23 @@ def _main():
                 if not current_diagnostic() or not current_diagnostic().data["exception_type"]:
                     failure(error)
                 raise
-    frozen,manifest_hash=source_snapshot(folder)  # capture manifest is now frozen
+    with boundary("CAPTURE_FREEZE", "MANIFEST_WRITE_FAILED"):
+        frozen,manifest_hash=source_snapshot(folder)  # capture manifest is now frozen
     try:
         if frozen["pairs"]:
-            phase("EXPORT")
-            if cfg.get("confirm_pdf_export",False):
-                from calibration.pdf_export import export_dialog
-                exported=export_dialog(folder,frozen,build_pdf)
-                if exported:print("PDF:",folder/exported["file"])
-                else:print("Export aufgeschoben; Originalaufnahmen bleiben erhalten.")
-            else:
-                plan=create_plan(folder,expected_manifest_hash=manifest_hash)
-                print("PDF:",execute_plan(folder,plan))
+            with boundary("EXPORT", "EXPORT_FAILED") as export_details:
+                phase("EXPORT")
+                if cfg.get("confirm_pdf_export",False):
+                    from calibration.pdf_export import export_dialog
+                    exported=export_dialog(folder,frozen,build_pdf)
+                    if exported:print("PDF:",folder/exported["file"])
+                    else:print("Export aufgeschoben; Originalaufnahmen bleiben erhalten.")
+                    export_details["result"]="created" if exported else "deferred"
+                    if not exported and current_diagnostic() and current_diagnostic().data["primary_failure"]:
+                        exit_code=2
+                else:
+                    plan=create_plan(folder,expected_manifest_hash=manifest_hash)
+                    print("PDF:",execute_plan(folder,plan))
     except (Exception,KeyboardInterrupt) as error:
         failure(error)
         exit_code=2;print("PDF fehlgeschlagen; Capture bleibt eingefroren:",error,flush=True)

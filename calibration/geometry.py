@@ -262,11 +262,22 @@ def css_to_screen(rect, mapping, viewport):
 def assert_same_selection(confirmed,current,rects):
     """Die bestaetigten ausgewaehlten Pixel binden auch den ersten Capture."""
     from PIL import ImageChops
+    from .diagnostics import checkpoint
     if confirmed.size!=current.size:
-        raise CalibrationError("SCREENSHOT_FAILED","Bildgroesse seit der Kontrollvorschau geaendert.")
-    for rect in rects.values():
+        error=CalibrationError("SCREENSHOT_FAILED","Bildgroesse seit der Kontrollvorschau geaendert.")
+        error.failure_code="PIXEL_GUARD_FAILED"
+        raise error
+    count=sum(bool(rect) for rect in rects.values())
+    for number,rect in enumerate(rects.values(),1):
         if rect:
             x,y,w,h=rect
             crop=(x,y,x+w,y+h)
-            if ImageChops.difference(confirmed.crop(crop),current.crop(crop)).getbbox() is not None:
-                raise CalibrationError("SCREENSHOT_FAILED","Zielbild hat sich seit der Kontrollvorschau geaendert. Neu kontrollieren/kalibrieren.")
+            diff=ImageChops.difference(confirmed.crop(crop),current.crop(crop))
+            from PIL import ImageStat
+            metric=max(ImageStat.Stat(diff).extrema[channel][1] for channel in range(len(diff.getbands())))
+            checkpoint("SELECTION_PIXEL_COMPARE", region_number=number,difference_metric=metric,threshold=0,compared_region_count=count)
+            if diff.getbbox() is not None:
+                error=CalibrationError("SCREENSHOT_FAILED","Zielbild hat sich seit der Kontrollvorschau geaendert. Neu kontrollieren/kalibrieren.")
+                error.failure_code="PIXEL_GUARD_FAILED"
+                error.metadata=dict(region_number=number,difference_metric=metric,threshold=0,compared_region_count=count)
+                raise error

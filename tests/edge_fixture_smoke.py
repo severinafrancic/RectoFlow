@@ -129,7 +129,9 @@ button{display:block;width:100px;height:60px;background:rgb(17,239,19);border:0;
         print(json.dumps(receipt,indent=2))
     finally:
         # Only our retained process handle/window, never terminate all browser processes.
-        if hwnd and gui.user.IsWindow(hwnd) and gui.process_identity()[0]==proc.pid:
+        owned_pid=W.DWORD()
+        if hwnd:gui.user.GetWindowThreadProcessId(hwnd,ctypes.byref(owned_pid))
+        if hwnd and proc.poll() is None and gui.user.IsWindow(hwnd) and owned_pid.value==proc.pid:
             gui.user.PostMessageW.argtypes=[W.HWND,W.UINT,W.WPARAM,W.LPARAM]
             gui.user.PostMessageW(hwnd,0x10,0,0)
         server.shutdown();server.server_close()

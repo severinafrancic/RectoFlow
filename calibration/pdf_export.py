@@ -125,6 +125,10 @@ def export_dialog(folder,manifest,builder):
             result={"file":path.relative_to(folder).as_posix(),"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),"options":values}
             root.destroy()
         except Exception as error:
+            from .failures import classified
+            from .diagnostics import failure
+            error=classified(error,"EXPORT_FAILED","EXPORT",{})
+            failure(error,recoverable=True)
             messagebox.showerror("PDF-Export fehlgeschlagen",str(error),parent=root)
     footer=ttk.Frame(root,padding=12)
     footer.pack(fill="x")

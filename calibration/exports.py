@@ -136,6 +136,10 @@ def create_plan(folder,selected=None,options=None,expected_manifest_hash=None):
     return path
 
 
+from .failures import instrument
+
+
+@instrument("EXPORT_RENDER", "EXPORT_FAILED")
 def execute_plan(folder,plan_path):
     import edge_capture
     folder=Path(folder).resolve();plan_path=Path(plan_path).resolve()

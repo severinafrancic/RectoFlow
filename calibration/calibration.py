@@ -12,7 +12,8 @@ from .config_io import updated_config, atomic_update
 from .dom_picker import DOMSession, suggestions, marker_bounds
 from .screenshot_picker import RectanglePicker
 from .regions import selection, capture_names, navigation
-from .diagnostics import phase, failure
+from .diagnostics import phase, failure, checkpoint
+from .failures import boundary, instrument
 
 
 def initial_rects(cfg,bounds):
@@ -138,7 +139,13 @@ def fresh_image(gui,park=False):
             gui.pause(.2)
         return gui.snapshot(areas=False)
     except Exception as error:
-        if getattr(error,"code",None)=="USER_CANCELLED":raise
+        if getattr(error,"failure_code","").startswith("SCREENSHOT_"):
+            compatible=CalibrationError("SCREENSHOT_FAILED",str(error))
+            compatible.failure_code=error.failure_code
+            compatible.failed_checkpoint=getattr(error,"failed_checkpoint",None)
+            compatible.diagnostic_origin=error
+            raise compatible from error
+        if getattr(error,"failure_code",None) or getattr(error,"code",None)=="USER_CANCELLED":raise
         code="SCREENSHOT_FAILED" if "SCREENSHOT_FAILED" in str(error) else "TARGET_WINDOW_LOST"
         raise CalibrationError(code,str(error)) from error
 
@@ -148,7 +155,8 @@ def calibrate(gui,cfg,path,expected_digest,validator):
     copied=False
     try:
         phase("TARGET_BINDING")
-        gui.bind(check_config=False,check_calibration=False)
+        with boundary("TARGET_BIND", "TARGET_BIND_FAILED"):
+            gui.bind(check_config=False,check_calibration=False)
         phase("CALIBRATION")
         target=gui.target_metadata()
         root=tk.Tk()
@@ -193,7 +201,8 @@ def calibrate(gui,cfg,path,expected_digest,validator):
             mode=first.get("navigation",mode)
             # Alle Auswahlfenster sind geschlossen, erst jetzt echten Zustand aufnehmen.
             image=fresh_image(gui)
-            final=RectanglePicker(root,image,rects,point,target["selection_bounds"],paper,orientation,final=True,navigation_mode=mode).show()
+            with boundary("FINAL_CONFIRMATION", "CONFIRMATION_FAILED", ok="FINAL_CONFIRMATION_REVIEW_OK"):
+                final=RectanglePicker(root,image,rects,point,target["selection_bounds"],paper,orientation,final=True,navigation_mode=mode).show()
             if final["action"]=="cancel":
                 raise CalibrationError("CALIBRATION_CANCELLED","Keine Einstellungen gespeichert.")
             if final["action"]=="recalibrate":
@@ -211,8 +220,14 @@ def calibrate(gui,cfg,path,expected_digest,validator):
             candidate["calibration"]["confirmed_at"]=datetime.now().astimezone().isoformat()
             current=fresh_image(gui)  # Zielidentitaet, Fenster und DPI unmittelbar vor Speichern
             # Hintergrund-Ladevorgaenge/Popups nach der Kontrollansicht nicht ignorieren.
-            assert_same_selection(image,current,final["rects"])
-            atomic_update(path,candidate,expected_digest,lambda c:validator(c,gui.size))
+            with boundary("SELECTION_GUARD", "PIXEL_GUARD_FAILED"):
+                assert_same_selection(image,current,final["rects"])
+            checkpoint("FINAL_CONFIRMATION_ACCEPTED")
+            def validate_candidate(c):
+                with boundary("CONFIG_VALIDATE", "CFG_INVALID"):
+                    validator(c,gui.size)
+            with boundary("CALIBRATION_SAVE", "CFG_INVALID"):
+                atomic_update(path,candidate,expected_digest,validate_candidate)
             print("Kalibrierung gespeichert:",path,";",candidate["paper_format"],candidate["paper_orientation"],flush=True)
             print("Keine Capture-Schleife gestartet. --preview oder regulaeren Lauf separat ausfuehren.",flush=True)
             return 0
@@ -235,6 +250,7 @@ def calibrate(gui,cfg,path,expected_digest,validator):
             root.destroy()
 
 
+@instrument("FINAL_CONFIRMATION", "CONFIRMATION_FAILED")
 def confirm_capture(gui,cfg):
     """Neue Kalibrierungen verlangen visuelle Kontrolle auch nach einem Neustart.
 
@@ -255,7 +271,8 @@ def confirm_capture(gui,cfg):
         if capture_names(result["rects"])!=capture_names(rects) or result["rects"]!=rects or result["point"]!=cfg["next_point"] or result["paper"]!=cfg.get("paper_format","Original") or result["orientation"]!=cfg.get("paper_orientation","portrait") or result.get("navigation",navigation(cfg))!=navigation(cfg):
             raise CalibrationError("INVALID_RECTANGLE","Auswahl wurde geaendert. Mit --calibrate speichern, danach Aufnahme neu starten.")
         current=fresh_image(gui,park=True)
-        assert_same_selection(image,current,rects)
+        with boundary("SELECTION_GUARD", "PIXEL_GUARD_FAILED"):
+            assert_same_selection(image,current,rects)
         return current
     finally:
         root.destroy()

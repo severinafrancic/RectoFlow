@@ -13,6 +13,20 @@ ROOT=Path(__file__).resolve().parents[1]
 VERSION="0.2.0"
 
 
+def public_bundle_members(folder):
+    """Allow only shipped resources. Runtime attempts/frames are never ZIP inputs."""
+    files={"RectoFlow.exe","config.json","LICENSE","README.de.md","THIRD_PARTY_NOTICES.md",
+           "SELF_CHECK.json","BUILD_METADATA.json","DEPENDENCIES.json"}
+    trees={"_internal","docs","third_party_licenses"}
+    for path in sorted(folder.rglob("*")):
+        if not path.is_file():continue
+        relative=path.relative_to(folder)
+        if relative.parts[0] not in files|trees:continue
+        if path.name=="first-frame.png" or any(part in ("data","diagnostics","attempts") for part in relative.parts):
+            raise RuntimeError("Private runtime data found inside shipped resource tree")
+        yield path
+
+
 def notices(destination):
     target=destination/"third_party_licenses"
     target.mkdir(exist_ok=True)
@@ -93,8 +107,8 @@ def main():
     artifacts.mkdir(exist_ok=True)
     output=artifacts/("RectoFlow-owner-test-windows-x64.zip" if args.owner_test else f"RectoFlow-{VERSION}-windows-x64.zip")
     with zipfile.ZipFile(output,"w",zipfile.ZIP_DEFLATED) as z:
-        for path in sorted(folder.rglob("*")):
-            if path.is_file():z.write(path,arcname="RectoFlow/"+path.relative_to(folder).as_posix())
+        for path in public_bundle_members(folder):
+            z.write(path,arcname="RectoFlow/"+path.relative_to(folder).as_posix())
     with zipfile.ZipFile(output) as z:
         if z.testzip():raise RuntimeError("ZIP integrity failed.")
     print(json.dumps({"artifact":str(output),"sha256":hashlib.sha256(output.read_bytes()).hexdigest(),

@@ -12,6 +12,8 @@ button_enabled.png
 button_disabled.png
 local-config.json
 data/
+/data/diagnostics/
+**/first-frame.png
 config.json.lock
 config.backup.*.json
 run_*/
