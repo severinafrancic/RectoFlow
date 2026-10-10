@@ -6,6 +6,7 @@ import time
 import uuid
 import threading
 import html
+import itertools
 from urllib.parse import quote
 
 _sessions = {}
@@ -104,12 +105,12 @@ def parse_payload(text, token, now=None):
         raise CalibrationError("DOM_PICKER_FAILED", "DOM-Metadaten sind zu gross.")
     try:
         data = json.loads(text)
-        if data["schema"] != 1 or data["token"] != token:
+        if type(data["schema"]) is not int or data["schema"] not in (1,2) or data["token"] != token:
             raise ValueError("Falsche oder alte Picker-Sitzung.")
         now = time.time() if now is None else now
         if not 0 <= now * 1000 - data["created_ms"] <= 180000:
             raise ValueError("DOM-Daten sind abgelaufen.")
-        if data["visual_scale"] != 1 or len(data["markers"]) != 3:
+        if not finite_number(data["visual_scale"]) or data["visual_scale"] != 1 or len(data["markers"]) != 3:
             raise ValueError("Pinch-Zoom/Marker nicht unterstuetzt.")
         if len(data["viewport"])!=2 or len(data["scroll"])!=2 or not .25 <= data["dpr"] <= 8:
             raise ValueError("Ungueltige DOM-Skalierung.")
@@ -124,9 +125,14 @@ def parse_payload(text, token, now=None):
             if marker["color"] != expected_colors[i] or marker["css_center"] != expected_centers[i]:
                 raise ValueError("Ungueltige Marker.")
         # Whitelist: kein Seitentext, URL, Cookies, IDs, Klassen oder DOM-Baum.
+        if not isinstance(data["rects"],dict):raise ValueError("Ungueltige DOM-Rechtecke.")
         rects = {}
-        for name in ("LEFT", "RIGHT", "NEXT", "PROGRESS"):
-            r = data["rects"].get(name)
+        candidates=data.get("candidates",[]) if data["schema"]==2 else []
+        if not isinstance(candidates,list) or len(candidates)>64:
+            raise ValueError("Zu viele oder ungueltige Seitenkandidaten.")
+        inputs={f"PAGE_CANDIDATE_{i}":r for i,r in enumerate(candidates,1)}
+        inputs.update({name:data["rects"].get(name) for name in (("LEFT","RIGHT","NEXT","PROGRESS") if data["schema"]==1 else ("NEXT","PROGRESS"))})
+        for name,r in inputs.items():
             if r is not None:
                 values=[r[k] for k in ("left","top","right","bottom","width","height")]
                 if any(not finite_number(v) for v in values) or r["width"]<=0 or r["height"]<=0 or abs(r["right"]-r["left"]-r["width"])>.01 or abs(r["bottom"]-r["top"]-r["height"])>.01:
@@ -144,21 +150,58 @@ def marker_bounds(image, color):
     return mask.getbbox()
 
 
+def marker_candidates(image, color, dpr, bounds):
+    """Narrow RGB distance + solid connected squares, never a union of clusters.
+
+    The original size limits and measured_mapping scale/alignment limits remain.
+    Eight channel levels cover small screenshot color rounding, not arbitrary hues.
+    """
+    delta=ImageChops.difference(image.convert("RGB"),Image.new("RGB",image.size,tuple(color)))
+    masks=[channel.point(lambda p:255 if p<=8 else 0) for channel in delta.split()]
+    mask=ImageChops.multiply(ImageChops.multiply(masks[0],masks[1]),masks[2])
+    pixels=bytearray(mask.tobytes());width,height=image.size
+    result=[];start=0
+    while True:
+        start=pixels.find(255,start)
+        if start<0:break
+        stack=[start];pixels[start]=0;left=right=start%width;top=bottom=start//width;area=0
+        while stack:
+            pos=stack.pop();x,y=pos%width,pos//width;area+=1
+            left=min(left,x);right=max(right,x);top=min(top,y);bottom=max(bottom,y)
+            for neighbor in ((pos-1 if x else -1),(pos+1 if x+1<width else -1),
+                             (pos-width if y else -1),(pos+width if y+1<height else -1)):
+                if neighbor>=0 and pixels[neighbor]:pixels[neighbor]=0;stack.append(neighbor)
+        w,h=right-left+1,bottom-top+1
+        if (18*dpr-3<=w<=22*dpr+3 and 18*dpr-3<=h<=22*dpr+3 and area>=.9*w*h
+                and bounds[0]<=left and bounds[1]<=top and right+1<=bounds[2] and bottom+1<=bounds[3]):
+            result.append((left,top,right+1,bottom+1))
+            if len(result)>16:
+                raise CalibrationError("COORDINATE_TRANSFORM_FAILED","Zu viele plausible Marker; neue HTML-Sitzung oder manuell auswaehlen.")
+    return result
+
+
 def suggestions(payload, screen, bounds):
-    points = []
-    for marker in payload["markers"]:
-        r = marker_bounds(screen, marker["color"])
-        dpr = payload["dpr"]
-        if r is None or not (18*dpr-3 <= r[2]-r[0] <= 22*dpr+3 and 18*dpr-3 <= r[3]-r[1] <= 22*dpr+3):
-            raise CalibrationError("COORDINATE_TRANSFORM_FAILED", "Sitzungsmarker fehlen oder sind mehrdeutig.")
-        validate_rect([r[0],r[1],r[2]-r[0],r[3]-r[1]], bounds)
-        points.append([(r[0]+r[2])/2,(r[1]+r[3])/2])
-    mapping = measured_mapping([m["css_center"] for m in payload["markers"]], points, payload["dpr"])
+    candidates=[marker_candidates(screen,m["color"],payload["dpr"],bounds) for m in payload["markers"]]
+    mappings=[]
+    for triple in itertools.product(*candidates):
+        points=[[(r[0]+r[2])/2,(r[1]+r[3])/2] for r in triple]
+        try:
+            mapping=measured_mapping([m["css_center"] for m in payload["markers"]],points,payload["dpr"])
+            sx,sy,ox,oy=mapping
+            # The whole measured DOM viewport must fit the selected screen area.
+            if ox<bounds[0]-2 or oy<bounds[1]-2 or ox+sx*payload["viewport"][0]>bounds[2]+2 or oy+sy*payload["viewport"][1]>bounds[3]+2:continue
+            mappings.append(mapping)
+        except CalibrationError:continue
+    if len(mappings)!=1:
+        raise CalibrationError("COORDINATE_TRANSFORM_FAILED", "Sitzungsmarker fehlen oder sind geometrisch mehrdeutig. HTML erneut versuchen oder manuell fortfahren.")
+    mapping=mappings[0]
     rects = {}
     for name, rect in payload["rects"].items():
         result = css_to_screen(rect, mapping, payload["viewport"])
         validate_rect(result, bounds)
         rects[name] = result
+    if not any(name.startswith("PAGE_CANDIDATE_") or name in ("LEFT","RIGHT") for name in rects):
+        raise CalibrationError("DOM_PICKER_FAILED","Keine sichtbaren Seitenkandidaten. HTML erneut versuchen oder manuell fortfahren.")
     diagnostic = {k:payload[k] for k in ("dpr","viewport","scroll")}
     diagnostic.update(mapping=list(mapping), css_rects=payload["rects"])
     return rects, diagnostic

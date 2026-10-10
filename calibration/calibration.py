@@ -44,7 +44,7 @@ def choose_dom(root,token):
     ttk.Label(win,text=text,wraplength=710,padding=15,justify="left").pack(fill="both",expand=True)
     frame=ttk.Frame(win,padding=10)
     frame.pack(fill="x")
-    session=None
+    session=DOMSession()
     def open_helper():
         nonlocal session
         try:
@@ -66,6 +66,7 @@ def choose_dom(root,token):
             result["mode"]="dom"
             win.destroy()
         except (OSError,tk.TclError,CalibrationError) as error:
+            failure(error,recoverable=True)
             messagebox.showwarning("DOM_PICKER_FAILED",f"{error}\nManuelle Auswahl bleibt moeglich.",parent=win)
     def manual():
         result["mode"]="manual"
@@ -80,6 +81,38 @@ def choose_dom(root,token):
     win.protocol("WM_DELETE_WINDOW",cancel)
     root.wait_window(win)
     if session:session.cancel()
+    return result
+
+
+def fallback_choice(root,error):
+    win=tk.Toplevel(root);win.title("HTML-Vorschlag nicht sicher abbildbar")
+    win.geometry("660x250")
+    result={"action":"cancel"}
+    ttk.Label(win,text="HTML-Vorschlag konnte nicht sicher auf Bildschirmkoordinaten abgebildet werden.\n\n"+str(error),wraplength=610,padding=15).pack(fill="both",expand=True)
+    def choose(action):
+        result["action"]=action;win.destroy()
+    row=ttk.Frame(win,padding=12);row.pack(fill="x")
+    for title,action in (("HTML-Auswahl erneut versuchen","retry"),("Manuell fortfahren","manual"),("Abbrechen","cancel")):
+        ttk.Button(row,text=title,command=lambda a=action:choose(a)).pack(side="left",padx=3)
+    win.bind("<Escape>",lambda e:choose("cancel"))
+    root.wait_window(win)
+    return result["action"]
+
+
+def apply_proposal(rects,proposed):
+    pages=[value for name,value in proposed.items() if name.startswith("PAGE_CANDIDATE_")]
+    if pages:
+        # Actual candidate count, including a single page. Geometry remains a
+        # proposal and must pass the editor and final confirmation.
+        result={f"REGION_{i:03d}":value for i,value in enumerate(pages,1)}
+        result.update({name:proposed.get(name,rects.get(name)) for name in ("NEXT","PROGRESS")})
+        return result
+    names=capture_names(rects);result=copy.deepcopy(rects)
+    for label,value in proposed.items():
+        if label in ("LEFT","RIGHT") and label not in result:
+            index=0 if label=="LEFT" else 1
+            if index<len(names):result[names[index]]=value
+        else:result[label]=value
     return result
 
 
@@ -105,6 +138,7 @@ def fresh_image(gui,park=False):
             gui.pause(.2)
         return gui.snapshot(areas=False)
     except Exception as error:
+        if getattr(error,"code",None)=="USER_CANCELLED":raise
         code="SCREENSHOT_FAILED" if "SCREENSHOT_FAILED" in str(error) else "TARGET_WINDOW_LOST"
         raise CalibrationError(code,str(error)) from error
 
@@ -120,30 +154,31 @@ def calibrate(gui,cfg,path,expected_digest,validator):
         root=tk.Tk()
         root.withdraw()
         token=uuid.uuid4().hex
-        choice=choose_dom(root,token)
-        copied=choice["copied"]
-        if choice["mode"]=="cancel":
-            raise CalibrationError("CALIBRATION_CANCELLED","Keine Einstellungen gespeichert.")
         diagnostic=None
         rects=initial_rects(cfg,target["selection_bounds"])
-        if choice["mode"]=="dom":
+        while True:
+            choice=choose_dom(root,token)
+            copied=choice["copied"]
+            if choice["mode"]=="cancel":
+                raise CalibrationError("CALIBRATION_CANCELLED","Keine Einstellungen gespeichert.")
+            if choice["mode"]!="dom":break
             try:
                 marked=fresh_image(gui)
                 proposed,diagnostic=suggestions(choice["payload"],marked,target["selection_bounds"])
-                if "regions" in cfg:
-                    names=capture_names(rects)
-                    for label,value in proposed.items():
-                        if label in ("LEFT","RIGHT"):
-                            index=0 if label=="LEFT" else 1
-                            if index<len(names):
-                                rects[names[index]]=value
-                        else:
-                            rects[label]=value
-                else:
-                    rects.update(proposed)
+                rects=apply_proposal(rects,proposed)
+                break
             except CalibrationError as error:
-                print(error,"-> manueller Screenshot-Picker.",flush=True)
-                messagebox.showwarning("DOM-Vorschlaege verworfen",str(error)+"\nAlle Rechtecke koennen manuell gesetzt werden.",parent=root)
+                failure(error,recoverable=True)
+                print(error,flush=True)
+                if copied:
+                    clean_dom(gui);copied=False
+                action=fallback_choice(root,error)
+                if action=="retry":
+                    token=uuid.uuid4().hex
+                    continue
+                if action=="cancel":
+                    raise CalibrationError("CALIBRATION_CANCELLED","Keine Einstellungen gespeichert.")
+                break
         image=clean_dom(gui) if copied else fresh_image(gui)
         copied=False
         paper=cfg.get("paper_format","A4")
@@ -166,6 +201,12 @@ def calibrate(gui,cfg,path,expected_digest,validator):
                 diagnostic=None  # alte DOM-Evidenz gilt nicht fuer neuen Zustand
                 continue
             candidate=updated_config(cfg,final["rects"],final["point"],target,diagnostic,final.get("navigation",mode))
+            if "page_layout_policy" in cfg and cfg["page_layout_policy"]["slot_count"]!=len(capture_names(final["rects"])):
+                from .page_layout import PolicyDialog
+                messagebox.showinfo("Seitenbelegung erneut pruefen","Die Slot-Anzahl wurde geaendert. Erste/Mittlere/Letzte und Ausnahmen neu einstellen; bisherige Config bleibt bis zum Speichern erhalten.",parent=root)
+                policy=PolicyDialog(root,len(capture_names(final["rects"])),max_views=cfg["max_spreads"]).show()
+                if policy is None:raise CalibrationError("CALIBRATION_CANCELLED","Keine Einstellungen gespeichert.")
+                candidate["page_layout_policy"]=policy
             candidate.update(paper_format=final["paper"],paper_orientation=final["orientation"])
             candidate["calibration"]["confirmed_at"]=datetime.now().astimezone().isoformat()
             current=fresh_image(gui)  # Zielidentitaet, Fenster und DPI unmittelbar vor Speichern
@@ -181,13 +222,14 @@ def calibrate(gui,cfg,path,expected_digest,validator):
         return 2
     except Exception as error:
         failure(error)
-        print("TARGET_WINDOW_LOST:",error,flush=True)
+        print(getattr(error,"code","TARGET_WINDOW_LOST")+":",error,flush=True)
         return 2
     finally:
         if copied:
             try:
                 clean_dom(gui)
             except Exception as error:
+                failure(error,recoverable=True)
                 print("DOM_PICKER_FAILED: Cleanup nicht bestaetigt:",error,"; F8 im Zieltab entfernt den Picker, sonst nach 180 s.",flush=True)
         if root is not None:
             root.destroy()

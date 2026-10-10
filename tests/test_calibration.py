@@ -457,7 +457,7 @@ class WizardTests(unittest.TestCase):
             path=Path(tmp)/"config.json"
             path.write_text(json.dumps(original))
             before=path.read_bytes()
-            with patch.object(wizard.tk,"Tk",return_value=fake_root),patch.object(wizard,"choose_dom",return_value=choice),patch.object(wizard,"fresh_image",return_value=image),patch.object(wizard,"clean_dom",return_value=image),patch.object(wizard,"RectanglePicker",side_effect=picks) as picker,patch.object(wizard,"suggestions",side_effect=CalibrationError("COORDINATE_TRANSFORM_FAILED","failed")),patch.object(wizard.messagebox,"showwarning"):
+            with patch.object(wizard.tk,"Tk",return_value=fake_root),patch.object(wizard,"choose_dom",return_value=choice),patch.object(wizard,"fresh_image",return_value=image),patch.object(wizard,"clean_dom",return_value=image),patch.object(wizard,"RectanglePicker",side_effect=picks) as picker,patch.object(wizard,"suggestions",side_effect=CalibrationError("COORDINATE_TRANSFORM_FAILED","failed")),patch.object(wizard.messagebox,"showwarning"),patch.object(wizard,"fallback_choice",return_value="manual"):
                 status=wizard.calibrate(fake_gui,original,path,hashlib.sha256(before).hexdigest(),edge.validate)
             return status,before,path.read_bytes(),picker.call_count
 

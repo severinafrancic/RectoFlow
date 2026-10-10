@@ -8,9 +8,10 @@
   if (window !== window.top) throw new Error('DOM_PICKER_FAILED: Top-Frame der Seite auswaehlen.');
   if (window[key]) window[key].cleanup();
   const abort = new AbortController();
-  const names = ['LEFT', 'RIGHT', 'NEXT', 'PROGRESS'];
+  const names = ['PAGES', 'NEXT', 'PROGRESS'];
   const colors = [[239,17,131], [17,239,131], [131,17,239]];
   const chosen = {};
+  const candidates = [];
   let step = 0, ready = false, hovered = null, timeout;
   const host = document.createElement('div');
   host.style.cssText = 'all:initial!important;position:fixed!important;inset:0!important;pointer-events:none!important;z-index:2147483647!important;';
@@ -19,7 +20,7 @@
   panel.style.cssText = 'position:fixed;right:12px;top:12px;max-width:440px;background:#132030;color:white;padding:12px;font:15px Arial;border:2px solid white;pointer-events:auto;';
   const line = document.createElement('div');
   const skip = document.createElement('button');
-  skip.textContent = 'Schritt ueberspringen (ESC)';
+  skip.textContent = 'Seiten fertig / weiter (ESC)';
   const cancel = document.createElement('button');
   cancel.textContent = 'Abbrechen / entfernen';
   const copyButton = document.createElement('button');
@@ -72,15 +73,21 @@
   function choose(el) {
     if (!el || ready) return;
     const r = el.getBoundingClientRect();
-    chosen[names[step]] = {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height,tag:el.tagName.toLowerCase()};
-    next();
+    const rect = {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};
+    if (step === 0) {
+      if (candidates.length >= 64) return;
+      // Multiple clicked pages remain in explicit selection order, never x/y sort.
+      if (!candidates.some(p=>JSON.stringify(p)===JSON.stringify(rect))) candidates.push(rect);
+      update();
+    } else {chosen[names[step]] = rect; next();}
   }
   function update() {
     hovered = null; highlight.hidden = true;
-    line.textContent = `${step+1}/4 ${names[step]} ungefaehr auswaehlen. Klick waehlt; ESC ueberspringt. Nicht scrollen/zoomen.`;
+    skip.textContent = step === 0 ? 'Seiten fertig / weiter (ESC)' : 'Schritt ueberspringen (ESC)';
+    line.textContent = step === 0 ? `${candidates.length} Seiten gewaehlt. Jede sichtbare Seite anklicken, dann Seiten fertig. Eine Seite ist gueltig. Nicht scrollen/zoomen.` : `${names[step]} ungefaehr auswaehlen. Klick waehlt; ESC ueberspringt.`;
   }
   function next() {
-    if (++step < 4) update(); else finish();
+    if (++step < 3) update(); else finish();
   }
   function invalidate() {
     cleanup();
@@ -92,10 +99,10 @@
     if (innerWidth < 180 || innerHeight < 180 || (visualViewport && visualViewport.scale !== 1)) return invalidate();
     positions.forEach((p,i) => {
       const marker = document.createElement('div');
-      marker.style.cssText = `position:fixed;left:${p[0]}px;top:${p[1]}px;width:24px;height:24px;border:2px solid black;box-sizing:border-box;background:rgb(${colors[i].join(',')});pointer-events:none;`;
+      marker.style.cssText = `position:fixed;left:${p[0]}px;top:${p[1]}px;width:24px;height:24px;border:2px solid black;box-sizing:border-box;background:rgb(${colors[i].join(',')});pointer-events:none;z-index:5!important;`;
       shadow.append(marker); markers.push(marker);
     });
-    const result = {schema:1,token,created_ms:created,dpr:devicePixelRatio,
+    const result = {schema:2,token,created_ms:created,dpr:devicePixelRatio,candidates,
       viewport:[innerWidth,innerHeight],scroll:[scrollX,scrollY],visual_scale:visualViewport?.scale || 1,
       markers:positions.map((p,i)=>({css_center:[p[0]+12,p[1]+12],color:colors[i]})),rects:chosen};
     textarea.value = JSON.stringify(result); textarea.hidden = false;
