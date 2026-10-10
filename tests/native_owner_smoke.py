@@ -30,7 +30,7 @@ def main():
                 seen=[]
                 for _ in range(9):
                     p.cycle_handle(1);root.update_idletasks();seen.append(p.active_handle or "MOVE")
-                    loupe=[p.canvas.itemcget(i,"text") for i in p.canvas.find_all() if p.canvas.type(i)=="text" and "8x | X" in p.canvas.itemcget(i,"text")]
+                    loupe=[p.canvas.itemcget(i,"text") for i in p.canvas.find_all() if p.canvas.type(i)=="text" and "4x | X" in p.canvas.itemcget(i,"text")]
                     assert bool(loupe)==bool(p.active_handle)
                 assert tuple(seen)==HANDLE_ORDER
                 p.activate_handle("SE");p.key_move(SimpleNamespace(widget=p.canvas,state=1,keysym="Right"));root.update_idletasks()

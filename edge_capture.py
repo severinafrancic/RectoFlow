@@ -58,9 +58,9 @@ def spread_rect(cfg):
     return [x,y,max(r[0]+r[2] for r in regions)-x,max(r[1]+r[3] for r in regions)-y]
 
 
-def content_image(image, cfg):
+def content_image(image, cfg, slots=None):
     """Vergleiche nur die echten Ausschnitte, keine wechselnden Inhalte im Abstand."""
-    images=[image.crop(box(r)) for r in capture_rects(cfg)]
+    images=[image.crop(box(r)) for i,r in enumerate(capture_rects(cfg),1) if slots is None or i in slots]
     joined = Image.new("RGB", (sum(im.width for im in images),max(im.height for im in images)), "white")
     offset=0
     for im in images:
@@ -69,8 +69,8 @@ def content_image(image, cfg):
     return joined
 
 
-def progress_image(image,cfg):
-    return image.crop(box(cfg["progress_rect"])) if cfg["progress_rect"] else content_image(image,cfg)
+def progress_image(image,cfg,slots=None):
+    return image.crop(box(cfg["progress_rect"])) if cfg["progress_rect"] else content_image(image,cfg,slots)
 
 
 def difference(a, b):
@@ -574,21 +574,32 @@ def _wait_ready(gui, cfg, previous, clock, aggregate):
     dwell=cfg["stable_seconds"]
     baseline=getattr(gui,"transition_content_baseline",None) if previous is not None else None
     if not isinstance(baseline,Image.Image):baseline=None
+    before_frame=getattr(gui,"transition_frame_baseline",None) if previous is not None else None
+    if not isinstance(before_frame,Image.Image):before_frame=None
+    from calibration.page_layout import policy_for,resolve_view
+    policy=policy_for(cfg)
+    view_index=getattr(gui,"capture_view_index",1)
+    if type(view_index) is not int:view_index=1
     while clock() - started < cfg["timeout_seconds"]:
         image = gui.snapshot()
-        content = content_image(image,cfg)
-        progress = progress_image(image,cfg)
         state = read_button(gui,image)
+        is_last=view_index==cfg["expected_spreads"] if cfg["expected_spreads"] is not None else state=="disabled"
+        slots,_=resolve_view(policy,view_index,is_last)
+        content = content_image(image,cfg,slots)
+        progress = progress_image(image,cfg,slots)
+        compared_previous=progress_image(before_frame,cfg,slots) if before_frame is not None else previous
+        compared_content=content_image(before_frame,cfg,slots) if before_frame is not None else baseline
         now = clock()
-        fresh = previous is None or difference(progress, previous) >= cfg["change_threshold"]
-        stable = anchor is not None and difference(content, anchor[0]) <= cfg["stable_tolerance"] and difference(progress, anchor[1]) <= cfg["stable_tolerance"]
+        fresh = previous is None or difference(progress, compared_previous) >= cfg["change_threshold"]
+        stable = anchor is not None and content.size==anchor[0].size and progress.size==anchor[1].size and difference(content, anchor[0]) <= cfg["stable_tolerance"] and difference(progress, anchor[1]) <= cfg["stable_tolerance"]
         aggregate.update(poll_count=aggregate["poll_count"]+1,elapsed=now-started,
                          change_detected=aggregate["change_detected"] or (previous is not None and fresh),
                          stable_detected=stable,last_button_state=state,
-                         progress_difference=difference(progress,previous) if previous is not None else None,
-                         content_difference=difference(content,baseline) if baseline is not None else difference(content,anchor[0]) if anchor is not None else None,
-                         stability_content_difference=difference(content,anchor[0]) if anchor is not None else None)
-        if baseline is not None:
+                         progress_difference=difference(progress,compared_previous) if previous is not None else None,
+                         content_difference=difference(content,compared_content) if compared_content is not None else difference(content,anchor[0]) if anchor is not None and content.size==anchor[0].size else None,
+                         stability_content_difference=difference(content,anchor[0]) if anchor is not None and content.size==anchor[0].size else None,
+                         active_slots=slots,view_index=view_index,change_source="advanced_progress" if cfg["progress_rect"] else "active_capture_slots")
+        if compared_content is not None:
             aggregate["content_change_detected"] |= aggregate["content_difference"]>=cfg["change_threshold"]
         diagnostic=current_diagnostic()
         if diagnostic and isinstance(getattr(gui,"last_uia_error",None),str):
@@ -636,6 +647,7 @@ def run_capture(gui, cfg, folder, manifest, confirmed_image=None):
     sparse = "page_layout_policy" in cfg
     policy = policy_for(cfg)
     phase("FIRST_CAPTURE")
+    gui.capture_view_index=1
     image, state, progress = wait_ready(gui, cfg)
     if confirmed_image is not None:
         with boundary("SELECTION_GUARD", "PIXEL_GUARD_FAILED"):
@@ -668,6 +680,7 @@ def run_capture(gui, cfg, folder, manifest, confirmed_image=None):
                 return
             if index==cfg["max_spreads"] or index==cfg["expected_spreads"]:
                 raise StopRun("Ansichtslimit erreicht.","CAPTURE_LIMIT_REACHED")
+            gui.capture_view_index=index+1
             image,state,progress=wait_ready(gui,cfg)
             continue
         if index == cfg["max_spreads"] or index == cfg["expected_spreads"]:
@@ -675,13 +688,15 @@ def run_capture(gui, cfg, folder, manifest, confirmed_image=None):
         # Ausgangsbild direkt vor dem Klick muss immer noch passen.
         with boundary("NAVIGATION_CHECK", "SELECTION_GUARD_FAILED") as details:
             current = gui.snapshot()
-            content_diff=difference(content_image(current,cfg),content_image(image,cfg))
-            progress_diff=difference(progress_image(current,cfg), progress)
+            content_diff=difference(content_image(current,cfg,slots),content_image(image,cfg,slots))
+            progress_diff=difference(progress_image(current,cfg,slots),progress_image(image,cfg,slots))
             details.update(content_difference=content_diff,progress_difference=progress_diff,threshold=cfg["stable_tolerance"],compared_region_count=len(capture_rects(cfg)))
             if content_diff > cfg["stable_tolerance"] or progress_diff > cfg["stable_tolerance"]:
                 raise StopRun("Ansicht hat sich zwischen Speicherung und Klick veraendert.","SELECTION_GUARD_FAILED")
         gui.click_next()  # genau EIN Klick pro bestaetigtem Uebergang
         gui.transition_content_baseline=content_image(current,cfg)
+        gui.transition_frame_baseline=current
+        gui.capture_view_index=index+1
         image, state, progress = wait_ready(gui, cfg, previous=progress)
 
 
@@ -886,9 +901,15 @@ def _main():
     confirmed_image=None
     if "regions" in cfg or cfg.get("calibration",{}).get("requires_visual_confirmation"):
         phase("FINAL_CONFIRMATION")
-        from calibration.calibration import confirm_capture
-        with boundary("FINAL_CONFIRMATION", "CONFIRMATION_FAILED", ok="FINAL_CONFIRMATION_ACCEPTED"):
+        from calibration.calibration import confirm_capture,RECALIBRATE,calibrate,assert_confirmation_file
+        with boundary("FINAL_CONFIRMATION", "CONFIRMATION_FAILED", ok="FINAL_CONFIRMATION_REVIEW_OK"):
+            assert_confirmation_file(config_path,config_bytes)
             confirmed_image=confirm_capture(gui,cfg)
+            if confirmed_image is not RECALIBRATE:assert_confirmation_file(config_path,config_bytes)
+        if confirmed_image is RECALIBRATE:
+            phase("CALIBRATION",mode="calibrate")
+            return calibrate(gui,cfg,config_path,hashlib.sha256(config_bytes).hexdigest(),validate)
+        checkpoint("FINAL_CONFIRMATION_ACCEPTED")
     manifest = {"schema": 4 if "page_layout_policy" in cfg else 3, "version":VERSION,"status": "RUNNING", "reason": "", "pairs": [], "config": cfg,
                 "script_sha256": sha256(Path(__file__)), "started": datetime.now().astimezone().isoformat(),
                 "window_title": gui.title(), "screen_size": gui.size,

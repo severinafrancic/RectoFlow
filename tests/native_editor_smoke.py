@@ -46,7 +46,7 @@ def main():
                 p.render()
                 assert p.loupe_photo.width()==168
                 texts=[p.canvas.itemcget(i,"text") for i in p.canvas.find_all() if p.canvas.type(i)=="text"]
-                assert any("8x | X 501 Y 310" in text for text in texts)
+                assert any("4x | X 501 Y 310" in text for text in texts)
             p.active_handle=None;p.reorder(-1)
             assert capture_names(p.rects)==["REGION_002","REGION_001","REGION_003"]
             assert p.region_list.get(0)=="1. Bereich"

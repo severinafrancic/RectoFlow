@@ -55,7 +55,7 @@ class PrecisionTests(unittest.TestCase):
         image=Image.new("RGB",(50,40))
         image.putpixel((23,17),(17,99,201))
         image.putpixel((24,17),(255,0,0))
-        zoomed,crosshair=magnifier_pixels(image,(23,17))
+        zoomed,crosshair=magnifier_pixels(image,(23,17),zoom=8)
         self.assertEqual(zoomed.size,(168,168));self.assertEqual(crosshair,(84,84))
         for x in range(80,88):
             for y in range(80,88):self.assertEqual(zoomed.getpixel((x,y)),(17,99,201))

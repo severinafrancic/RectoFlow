@@ -197,7 +197,7 @@ def to_screen(point, transform):
     return [round((point[0] - ox) / scale), round((point[1] - oy) / scale)]
 
 
-def magnifier_pixels(image, point, zoom=8, extent=21):
+def magnifier_pixels(image, point, zoom=4, extent=21):
     """Sample original physical pixels, including black padding at image edges."""
     from PIL import Image
     x, y = (round(v) for v in point)

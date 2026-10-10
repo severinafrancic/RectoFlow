@@ -7,13 +7,15 @@ import webbrowser
 from pathlib import Path
 import uuid
 
-from .geometry import CalibrationError, right_rect, center, validate_rect, assert_same_selection
+from .geometry import CalibrationError, right_rect, center, validate_rect, validate_selection, assert_same_selection
 from .config_io import updated_config, atomic_update
 from .dom_picker import DOMSession, suggestions, marker_bounds
 from .screenshot_picker import RectanglePicker
 from .regions import selection, capture_names, navigation
 from .diagnostics import phase, failure, checkpoint
 from .failures import boundary, instrument
+
+RECALIBRATE = object()
 
 
 def initial_rects(cfg,bounds):
@@ -171,9 +173,11 @@ def calibrate(gui,cfg,path,expected_digest,validator):
                 raise CalibrationError("CALIBRATION_CANCELLED","Keine Einstellungen gespeichert.")
             if choice["mode"]!="dom":break
             try:
-                marked=fresh_image(gui)
+                with boundary("DOM_SCREENSHOT", "DOM_SCREENSHOT_FAILED"):
+                    marked=fresh_image(gui)
                 proposed,diagnostic=suggestions(choice["payload"],marked,target["selection_bounds"])
-                rects=apply_proposal(rects,proposed)
+                with boundary("DOM_PROPOSAL_ADAPT", "DOM_RECT_TRANSFORM_FAILED"):
+                    rects=apply_proposal(rects,proposed)
                 break
             except CalibrationError as error:
                 failure(error,recoverable=True)
@@ -260,19 +264,78 @@ def confirm_capture(gui,cfg):
     root=tk.Tk()
     root.withdraw()
     try:
+        saved=confirmation_state(cfg)
         target=gui.target_metadata()
         image=fresh_image(gui,park=True)
-        rects=initial_rects(cfg,target["selection_bounds"])
+        # Exact persisted authority: no editor normalization or invalid-rect clearing.
+        rects=selection(cfg)
+        validate_selection(rects,cfg["next_point"],target["selection_bounds"],navigation(cfg))
         result=RectanglePicker(root,image,rects,cfg["next_point"],target["selection_bounds"],
-                               cfg.get("paper_format","Original"),cfg.get("paper_orientation","portrait"),final=True,save_label="Aufnahme starten",navigation_mode=navigation(cfg)).show()
+                               cfg.get("paper_format","Original"),cfg.get("paper_orientation","portrait"),final=True,save_label="Aufnahme starten",navigation_mode=navigation(cfg),read_only=True).show()
+        if result["action"]=="recalibrate":return RECALIBRATE
         if result["action"]!="save":
             raise CalibrationError("CALIBRATION_CANCELLED","Capture nicht gestartet; --calibrate fuer Aenderungen.")
-        # Dict equality alone ignores insertion order, which is the PDF order.
-        if capture_names(result["rects"])!=capture_names(rects) or result["rects"]!=rects or result["point"]!=cfg["next_point"] or result["paper"]!=cfg.get("paper_format","Original") or result["orientation"]!=cfg.get("paper_orientation","portrait") or result.get("navigation",navigation(cfg))!=navigation(cfg):
-            raise CalibrationError("INVALID_RECTANGLE","Auswahl wurde geaendert. Mit --calibrate speichern, danach Aufnahme neu starten.")
+        observed=review_state(result)
+        assert_confirmation_state(saved,observed,source="review")
+        assert_confirmation_state(saved,confirmation_state(cfg),source="config")
         current=fresh_image(gui,park=True)
         with boundary("SELECTION_GUARD", "PIXEL_GUARD_FAILED"):
             assert_same_selection(image,current,rects)
+        assert_confirmation_state(saved,confirmation_state(cfg),source="config_after_snapshot")
         return current
     finally:
         root.destroy()
+
+
+def review_state(result):
+    rects=result["rects"]
+    return copy.deepcopy({"region_order":capture_names(rects),
+        "region_rects":{name:rects[name] for name in capture_names(rects)},
+        "NEXT":rects.get("NEXT"),"PROGRESS":rects.get("PROGRESS"),
+        "click_point":result["point"],"paper":result["paper"],
+        "orientation":result["orientation"],"navigation":result.get("navigation","next_button")})
+
+
+def confirmation_state(cfg):
+    return review_state(dict(rects=selection(cfg),point=cfg["next_point"],
+        paper=cfg.get("paper_format","Original"),orientation=cfg.get("paper_orientation","portrait"),navigation=navigation(cfg)))
+
+
+def assert_confirmation_state(saved,observed,source):
+    mismatches=[]
+    for field in saved:
+        if field=="region_rects":
+            for name in dict.fromkeys([*saved[field],*observed[field]]):
+                if saved[field].get(name)!=observed[field].get(name):
+                    mismatches.append(dict(field="region_rects."+name,old=saved[field].get(name),new=observed[field].get(name)))
+        elif saved[field]!=observed[field]:
+            mismatches.append(dict(field=field,old=saved[field],new=observed[field]))
+    for difference in mismatches:
+        checkpoint("CONFIRMATION_FIELD_MISMATCH",source=source,**difference)
+    if mismatches:
+        # Keep the legacy exception code for existing API callers; the diagnostic
+        # taxonomy and visible detail use the specific new stable failure code.
+        error=CalibrationError("INVALID_RECTANGLE","CONFIRMATION_STATE_MISMATCH: Gespeicherte Auswahl unerwartet geaendert: "+", ".join(m["field"] for m in mismatches))
+        error.failure_code="CONFIRMATION_STATE_MISMATCH"
+        error.metadata=dict(source=source,mismatches=mismatches)
+        raise error
+
+
+@instrument("CONFIRMATION_CONFIG_CHECK", "CONFIRMATION_STATE_MISMATCH")
+def assert_confirmation_file(path,expected_bytes):
+    """An external edit cannot silently replace the persisted capture authority."""
+    import hashlib,json
+    from .storage import config_transaction
+    with config_transaction(path):observed_bytes=Path(path).read_bytes()
+    if observed_bytes==expected_bytes:return
+    try:
+        assert_confirmation_state(confirmation_state(json.loads(expected_bytes)),confirmation_state(json.loads(observed_bytes)),source="persisted_config")
+    except CalibrationError:raise
+    except (ValueError,KeyError,TypeError) as cause:
+        error=CalibrationError("INVALID_RECTANGLE","CONFIRMATION_STATE_MISMATCH: Config waehrend der Kontrolle ungueltig geworden.")
+        error.failure_code="CONFIRMATION_STATE_MISMATCH"
+        raise error from cause
+    error=CalibrationError("INVALID_RECTANGLE","CONFIRMATION_STATE_MISMATCH: Config-Datei waehrend der Kontrolle geaendert; neu laden.")
+    error.failure_code="CONFIRMATION_STATE_MISMATCH"
+    error.metadata=dict(old_sha256=hashlib.sha256(expected_bytes).hexdigest(),new_sha256=hashlib.sha256(observed_bytes).hexdigest())
+    raise error

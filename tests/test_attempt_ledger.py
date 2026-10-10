@@ -73,8 +73,8 @@ class LedgerTests(unittest.TestCase):
                ("selection","TARGET_SELECTION_FAILED","TARGET_PICK","CONFIG_VALIDATE_OK"),
                ("bind","TARGET_BIND_FAILED","TARGET_BIND","TARGET_PICK_OK"),
                ("guard","TARGET_FOCUS_LOST","TARGET_GUARD","TARGET_PICK_OK"),
-               ("confirmation","CONFIRMATION_FAILED","FINAL_CONFIRMATION","TARGET_BIND_OK"),
-               ("changed","TARGET_CHANGED","FINAL_CONFIRMATION","TARGET_BIND_OK")]
+               ("confirmation","CONFIRMATION_FAILED","FINAL_CONFIRMATION","CONFIRMATION_CONFIG_CHECK_OK"),
+               ("changed","TARGET_CHANGED","FINAL_CONFIRMATION","CONFIRMATION_CONFIG_CHECK_OK")]
         for case,code,step,last in cases:
             with self.subTest(case=case),tempfile.TemporaryDirectory(dir=SCRATCH) as td:
                 root=Path(td);path=root/"config.json";cfg=config();cfg["output_dir"]="captures"
@@ -97,6 +97,8 @@ class LedgerTests(unittest.TestCase):
                     with self.assertRaises(Exception):core.main(d)
                 self.failed(d,code,step)
                 self.assertEqual(d.data["primary_failure"]["last_successful_checkpoint"],last)
+                if case in ("confirmation","changed"):
+                    self.assertIn("TARGET_BIND_OK",[e["event"] for e in self.events(d)])
                 self.assertFalse(d.data["first_frame_acquired"])
                 self.assertFalse(list((root/"captures").glob("run_*")))
                 self.assertFalse(d.data["manifest_created"])

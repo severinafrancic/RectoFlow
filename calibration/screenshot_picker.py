@@ -14,14 +14,22 @@ COLORS = {"LEFT":"#ff5252", "RIGHT":"#4ca6ff", "NEXT":"#41ef92", "PROGRESS":"#ff
 HANDLE_ORDER=("nw","n","ne","e","se","s","sw","w","MOVE")
 
 
+def editable(function):
+    """Read-only review has no editing entry point, including direct shortcuts."""
+    def call(self,*args,**kwargs):
+        if not getattr(self,"read_only",False):return function(self,*args,**kwargs)
+    return call
+
+
 class RectanglePicker:
-    def __init__(self, root, image, rects, point, bounds, paper="A4", orientation="portrait", final=False, save_label=None, navigation_mode="next_button"):
+    def __init__(self, root, image, rects, point, bounds, paper="A4", orientation="portrait", final=False, save_label=None, navigation_mode="next_button", read_only=False):
         self.root, self.image, self.bounds = root, image, bounds
         self.final=final
+        self.read_only=read_only
         self.rects = copy.deepcopy(rects)
         self.rects.setdefault("NEXT",None)
         self.rects.setdefault("PROGRESS",None)
-        self.point = list(point) if point and self.rects["NEXT"] and contains(self.rects["NEXT"], point) else center(self.rects["NEXT"]) if self.rects["NEXT"] else None
+        self.point = copy.deepcopy(point) if read_only else list(point) if point and self.rects["NEXT"] and contains(self.rects["NEXT"], point) else center(self.rects["NEXT"]) if self.rects["NEXT"] else None
         self.result = None
         self.selected = capture_names(self.rects)[0] if capture_names(self.rects) else "NEXT"
         self.mode = "edit"
@@ -39,6 +47,9 @@ class RectanglePicker:
         self.window.state("zoomed")
         self.window.protocol("WM_DELETE_WINDOW", self.cancel)
         self.window.bind("<Escape>", lambda e:self.cancel())
+        if read_only:
+            self.build_review(paper,orientation,navigation_mode,save_label)
+            return
         self.window.bind("<Delete>", lambda e:self.editor_shortcut(e,self.delete))
         self.window.bind("<Return>", lambda e:self.editor_shortcut(e,self.accept))
         for key in ("Left", "Right", "Up", "Down"):
@@ -134,6 +145,27 @@ class RectanglePicker:
         self.window.focus_force()
         self.canvas.focus_set()
 
+    def build_review(self,paper,orientation,navigation_mode,save_label):
+        self.paper=tk.StringVar(value=paper)
+        self.orientation=tk.StringVar(value=orientation)
+        self.navigation=tk.StringVar(value=navigation_mode)
+        self.status=tk.StringVar(value="Gespeicherte Auswahl — nur Kontrolle, Aenderungen ueber Neukalibrierung")
+        ttk.Label(self.window,text=f"{paper} / {orientation} | Navigation: {navigation_mode}",padding=8).pack(fill="x")
+        footer=ttk.Frame(self.window,padding=8);footer.pack(side="bottom",fill="x")
+        for text,action in ((save_label or "Aufnahme starten",self.accept),("Neu kalibrieren",self.recalibrate),("Abbrechen",self.cancel)):
+            ttk.Button(footer,text=text,command=action).pack(side="right",padx=4)
+        ttk.Label(footer,textvariable=self.status).pack(side="left")
+        workspace=ttk.Frame(self.window);workspace.pack(fill="both",expand=True)
+        self.region_list=tk.Listbox(workspace,width=26,exportselection=False)
+        self.region_list.pack(side="left",fill="y")
+        self.region_list.bind("<<ListboxSelect>>",self.list_selected)
+        self.canvas=tk.Canvas(workspace,background="#23262c",highlightthickness=0)
+        self.canvas.pack(side="left",fill="both",expand=True)
+        self.canvas.bind("<Configure>",lambda e:self.render())
+        self.transform=(1,0,0);self.photo=None
+        self.refresh_selector();self.window.update_idletasks()
+        self.window.focus_force()
+
     def select(self,name):
         self.selected, self.mode = name, "edit"
         self.active_handle = None
@@ -173,6 +205,7 @@ class RectanglePicker:
         if name=="PROGRESS":return "Seitenwechsel erkennen (optional)"
         return f"Bereich {capture_names(self.rects).index(name)+1}"
 
+    @editable
     def modernize(self):
         if "LEFT" in self.rects or "RIGHT" in self.rects:
             ordered=[(f"REGION_{i:03d}",self.rects[name]) for i,name in enumerate(capture_names(self.rects),1)]
@@ -183,6 +216,7 @@ class RectanglePicker:
             if old_selected in names:
                 self.selected=f"REGION_{names.index(old_selected)+1:03d}"
 
+    @editable
     def add_region(self):
         before=self.snapshot()
         self.modernize()
@@ -200,6 +234,7 @@ class RectanglePicker:
         self.next_region_id=index+1
         return f"REGION_{index:03d}"
 
+    @editable
     def reorder(self,direction):
         if self.selected not in capture_names(self.rects):
             return
@@ -214,12 +249,14 @@ class RectanglePicker:
             self.select(self.selected)
             self.remember(before)
 
+    @editable
     def draw_new(self):
         if self.is_locked():
             return
         self.mode = "draw"
         self.render()
 
+    @editable
     def delete(self):
         before=self.snapshot()
         if self.selected in capture_names(self.rects):
@@ -239,6 +276,7 @@ class RectanglePicker:
         self.render()
         self.remember(before)
 
+    @editable
     def set_point(self):
         self.selected, self.mode = "NEXT", "point"
         self.render()
@@ -246,6 +284,7 @@ class RectanglePicker:
     def paper_changed(self,event=None):
         self.render()
 
+    @editable
     def fit_selected(self):
         if self.is_locked():
             return
@@ -262,6 +301,7 @@ class RectanglePicker:
         except CalibrationError as error:
             messagebox.showerror("Papierformat",str(error),parent=self.window)
 
+    @editable
     def duplicate_region(self):
         if self.selected not in capture_names(self.rects) or self.rects[self.selected] is None:return
         for direction in ("right","down","left","up"):
@@ -274,6 +314,7 @@ class RectanglePicker:
                 return
         messagebox.showwarning("Duplizieren","Kein Platz fuer eine versetzte Kopie gleicher Groesse. Auswahl unveraendert.",parent=self.window)
 
+    @editable
     def add_adjacent(self,direction):
         if self.selected not in capture_names(self.rects) or self.rects[self.selected] is None:return
         try:
@@ -284,6 +325,7 @@ class RectanglePicker:
         except (ValueError,CalibrationError) as error:
             messagebox.showwarning("Nachbarbereich unveraendert",str(error),parent=self.window)
 
+    @editable
     def insert_region(self,rect):
         before=self.snapshot()
         self.modernize()
@@ -296,6 +338,7 @@ class RectanglePicker:
         self.refresh_selector();self.select(name)
         self.remember(before)
 
+    @editable
     def align_selected(self,operation):
         if operation=="size" and self.is_locked():
             return
@@ -331,7 +374,7 @@ class RectanglePicker:
             label=f"{self.display_name(name)} [{x},{y},{w},{h}]"+(" FIXIERT" if name in getattr(self,"locked",set()) else "")
             self.canvas.create_rectangle(l,t,l+max(160,len(label)*8),t+23,fill="#111111",outline=color)
             self.canvas.create_text(l+5,t+3,text=label,fill=color,anchor="nw")
-            if name == self.selected and not self.is_locked():
+            if name == self.selected and not self.is_locked() and not self.read_only:
                 for handle,(px,py) in self.handles(rect).items():
                     cx,cy=ox+px*s,oy+py*s
                     self.canvas.create_rectangle(cx-6,cy-6,cx+6,cy+6,fill="white" if handle==self.active_handle else color,outline="#111")
@@ -343,8 +386,10 @@ class RectanglePicker:
         mode="Groesse fixiert: nur verschieben" if self.is_locked() else "ziehen/8 Griffe"
         active=(getattr(self,"active_handle",None) or "MOVE").upper()
         if hasattr(self,"handle_var"):self.handle_var.set(active)
-        self.status.set(f"{self.display_name(self.selected)} — Handle: {active} | {mode} | Tab: Handle | Pfeil 1 px / Shift 10 px")
+        if not self.read_only:
+            self.status.set(f"{self.display_name(self.selected)} — Handle: {active} | {mode} | Tab: Handle | Pfeil 1 px / Shift 10 px")
 
+    @editable
     def activate_handle(self,handle):
         handle=handle.lower() if handle!="MOVE" else "MOVE"
         self.active_handle=None if handle=="MOVE" or self.is_locked() else handle
@@ -353,6 +398,7 @@ class RectanglePicker:
         if hasattr(self,"canvas"):self.canvas.focus_set()
         self.render()
 
+    @editable
     def cycle_handle(self,direction):
         if self.is_locked():
             self.activate_handle("MOVE")
@@ -364,6 +410,7 @@ class RectanglePicker:
     def is_locked(self):
         return self.selected in getattr(self,"locked",set())
 
+    @editable
     def toggle_lock(self):
         if self.rects.get(self.selected) is None:
             self.lock_var.set(False)
@@ -389,7 +436,7 @@ class RectanglePicker:
         if position is None:
             return
         left,top=position
-        pixels,crosshair=magnifier_pixels(self.image,(x,y))
+        pixels,crosshair=magnifier_pixels(self.image,(x,y),extent=42)
         self.loupe_photo=ImageTk.PhotoImage(pixels,master=self.window)
         self.canvas.create_rectangle(left,top,left+184,top+210,fill="#111",outline="white",width=2)
         self.canvas.create_image(left+8,top+8,image=self.loupe_photo,anchor="nw")
@@ -397,9 +444,10 @@ class RectanglePicker:
         for color,thickness in (("black",3),("white",1)):
             self.canvas.create_line(cx-14,cy,cx+14,cy,fill=color,width=thickness)
             self.canvas.create_line(cx,cy-14,cx,cy+14,fill=color,width=thickness)
-        text=f"8x | X {round(x)} Y {round(y)}\n{self.active_handle or 'Neue Ecke'}"
+        text=f"4x | X {round(x)} Y {round(y)}\n{self.active_handle or 'Neue Ecke'}"
         self.canvas.create_text(left+8,top+178,text=text,fill="white",anchor="nw")
 
+    @editable
     def key_move(self,event):
         if isinstance(event.widget,(tk.Entry,ttk.Entry,ttk.Combobox,tk.Text,tk.Spinbox,ttk.Spinbox)):
             return
@@ -439,17 +487,20 @@ class RectanglePicker:
         self.undo_stack=self.undo_stack[-100:]
         self.redo_stack.clear()
 
+    @editable
     def restore_state(self,state):
         items,self.point,self.selected,self.locked=copy.deepcopy(state)
         self.rects=dict(items)
         self.drag=None;self.drag_before=None;self.active_handle=None;self.magnifier_point=None
         self.refresh_selector();self.select(self.selected)
 
+    @editable
     def undo(self):
         if self.drag:return
         if getattr(self,"undo_stack",[]):
             self.redo_stack.append(self.snapshot());self.restore_state(self.undo_stack.pop())
 
+    @editable
     def redo(self):
         if self.drag:return
         if getattr(self,"redo_stack",[]):
@@ -472,6 +523,7 @@ class RectanglePicker:
         return {"nw":(x,y),"n":(x+w/2,y),"ne":(x+w,y),"e":(x+w,y+h/2),
                 "se":(x+w,y+h),"s":(x+w/2,y+h),"sw":(x,y+h),"w":(x,y+h/2)}
 
+    @editable
     def press(self,event):
         if hasattr(self,"canvas"):self.canvas.focus_set()
         p=to_screen((event.x,event.y),self.transform)
@@ -508,6 +560,7 @@ class RectanglePicker:
             self.rects[self.selected]=new_rect(p,p,self.bounds)
         self.render()
 
+    @editable
     def motion(self,event):
         if not self.drag:
             return
@@ -525,10 +578,12 @@ class RectanglePicker:
     def accept(self):
         try:
             mode=self.navigation.get() if hasattr(self,"navigation") else "next_button"
-            warn=validate_selection(self.rects,self.point,self.bounds,mode)
-            if warn and not messagebox.askyesno("Ueberlappung","Aufnahmebereiche ueberlappen stark. Diese Auswahl ausdruecklich bestaetigen?",parent=self.window):
+            # Capture validates the persisted snapshot before opening review and
+            # compares every returned field afterward, including invalid mutations.
+            warn=False if getattr(self,"read_only",False) else validate_selection(self.rects,self.point,self.bounds,mode)
+            if not getattr(self,"read_only",False) and warn and not messagebox.askyesno("Ueberlappung","Aufnahmebereiche ueberlappen stark. Diese Auswahl ausdruecklich bestaetigen?",parent=self.window):
                 return
-            if not messagebox.askyesno("Auswahl bestaetigen",f"{self.paper.get()} / {self.orientation.get()}: alle Rechtecke und Klickpunkt kontrolliert?",parent=self.window):
+            if not getattr(self,"read_only",False) and not messagebox.askyesno("Auswahl bestaetigen",f"{self.paper.get()} / {self.orientation.get()}: alle Rechtecke und Klickpunkt kontrolliert?",parent=self.window):
                 return
             self.result={"action":"save","rects":copy.deepcopy(self.rects),"point":list(self.point) if self.point else None,"paper":self.paper.get(),"orientation":self.orientation.get(),"navigation":mode}
             self.window.destroy()
