@@ -6,6 +6,41 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, simpledialog
 
 import edge_capture as core
+from calibration.diagnostics import Diagnostic, current, scope
+
+
+def show_workflow_error(diagnostic, code):
+    if diagnostic.dialog_shown:
+        return
+    diagnostic.dialog_shown = True
+    dialog = None
+    try:
+        dialog = tk.Tk()
+        dialog.withdraw()
+        messagebox.showerror("RectoFlow gestoppt", diagnostic.dialog_text(code), parent=dialog)
+    except tk.TclError:
+        # Last native fallback if Tk cannot create a dialog after launcher teardown.
+        if sys.platform == "win32":
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(None, diagnostic.dialog_text(code), "RectoFlow gestoppt", 0x10)
+    finally:
+        if dialog is not None:
+            try: dialog.destroy()
+            except tk.TclError: pass
+
+
+def graphical_core():
+    diagnostic = current() or Diagnostic(core.config_root(), core.VERSION, "gui")
+    with scope(diagnostic):
+        try:
+            code = core.main()
+        except (Exception, KeyboardInterrupt) as error:
+            diagnostic.failure(error)
+            code = 2
+        diagnostic.finish(code)
+        if code != 0:
+            show_workflow_error(diagnostic, code)
+        return code
 
 def self_check():
     import importlib.metadata
@@ -128,14 +163,16 @@ def launcher():
         from calibration.exports import running_state
         state=running_state(path.parent)
         if state not in ("COMPLETE","STOPPED","PDF_FAILED"):
-            messagebox.showwarning("Aufnahme nicht abgeschlossen",state+"\nOriginaldateien bleiben erhalten. Kein Resume in Version 0.2.")
+            if current():
+                current().phase("EXPORT", run_path=str(path.parent))
+                current().failure(ValueError(state+"\nOriginaldateien bleiben erhalten. Kein Resume in Version 0.2."))
             return 2
         result=export_dialog(path.parent,json.loads(path.read_text(encoding="utf-8")),core.build_pdf)
         if result:
             messagebox.showinfo("PDF fertig",f"Gespeichert:\n{path.parent/result['file']}")
         return 0
     sys.argv=[sys.argv[0]]+(["--profile",profile_uuid] if profile_uuid else ["--config",selected.get()])+([] if action=="--capture" else [action])
-    return core.main()
+    return graphical_core()
 
 
 def main():
@@ -150,13 +187,18 @@ def main():
 
 def entrypoint():
     graphical = len(sys.argv)==1 or sys.argv[1:]==["--gui"]
-    try:
-        return main()
-    except (Exception,KeyboardInterrupt) as error:
-        print(f"STOPP: {type(error).__name__}: {error}",file=sys.stderr)
-        if graphical and getattr(sys,"frozen",False):
-            messagebox.showerror("RectoFlow gestoppt",str(error))
-        return 2
+    diagnostic = Diagnostic(core.config_root(), core.VERSION, "gui" if graphical else "cli")
+    with scope(diagnostic):
+        try:
+            code = main()
+        except (Exception,KeyboardInterrupt) as error:
+            diagnostic.failure(error)
+            print(f"STOPP: {type(error).__name__}: {error}",file=sys.stderr)
+            code = 2
+        diagnostic.finish(code)
+        if graphical and code != 0:
+            show_workflow_error(diagnostic, code)
+        return code
 
 
 if __name__=="__main__":

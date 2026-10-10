@@ -12,6 +12,7 @@ from .config_io import updated_config, atomic_update
 from .dom_picker import DOMSession, suggestions, marker_bounds
 from .screenshot_picker import RectanglePicker
 from .regions import selection, capture_names, navigation
+from .diagnostics import phase, failure
 
 
 def initial_rects(cfg,bounds):
@@ -106,7 +107,9 @@ def calibrate(gui,cfg,path,expected_digest,validator):
     root=None
     copied=False
     try:
+        phase("TARGET_BINDING")
         gui.bind(check_config=False,check_calibration=False)
+        phase("CALIBRATION")
         target=gui.target_metadata()
         root=tk.Tk()
         root.withdraw()
@@ -167,9 +170,11 @@ def calibrate(gui,cfg,path,expected_digest,validator):
             print("Keine Capture-Schleife gestartet. --preview oder regulaeren Lauf separat ausfuehren.",flush=True)
             return 0
     except CalibrationError as error:
+        failure(error)
         print(error,flush=True)
         return 2
     except Exception as error:
+        failure(error)
         print("TARGET_WINDOW_LOST:",error,flush=True)
         return 2
     finally:

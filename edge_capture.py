@@ -26,6 +26,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 from calibration.geometry import right_rect, PAPER_MM, assert_same_selection, finite_number
 from calibration.regions import capture_rects, selection, image_names, navigation, browser_name
+from calibration.diagnostics import Diagnostic, current as current_diagnostic, scope as diagnostic_scope, phase, failure
 
 VERSION = "0.2.0"
 
@@ -258,6 +259,10 @@ class WindowsGUI:
         if not live["ready"] or any(live[k]!=selected[k] for k in ("identity","exe","environment")):
             raise StopRun("TARGET_WINDOW_LOST: Auswahl ist nicht mehr aktuell.")
         self.browser = live["browser"]
+        diagnostic = current_diagnostic()
+        if diagnostic:
+            diagnostic.private_values.add(self.title())
+            phase("TARGET_BINDING", browser_name=self.browser, **{k:live["environment"][k] for k in ("monitor","dpi","window_bounds")})
         self.bound_exe = live["exe"]
         self.initial_geometry = tuple(live["environment"]["window_bounds"])
         self.bound_identity = live["identity"]
@@ -558,6 +563,7 @@ def save_pair(folder, index, screenshot, cfg):
 
 
 def run_capture(gui, cfg, folder, manifest, confirmed_image=None):
+    phase("FIRST_CAPTURE")
     image, state, progress = wait_ready(gui, cfg)
     if confirmed_image is not None:
         assert_same_selection(confirmed_image,image,selection(cfg))
@@ -565,6 +571,7 @@ def run_capture(gui, cfg, folder, manifest, confirmed_image=None):
         # Nur komplett gespeicherte Paare ins Manifest aufnehmen.
         manifest["pairs"].append(save_pair(folder, index, image, cfg))
         write_json(folder / "manifest.json", manifest)
+        phase("CAPTURE_LOOP", capture_count=len(manifest["pairs"]))
         print(f"Ansicht {index}: {len(capture_rects(cfg))} Bereiche gespeichert; Weiter={state}.", flush=True)
         if state == "disabled":
             if cfg["expected_spreads"] is not None and index != cfg["expected_spreads"]:
@@ -633,7 +640,33 @@ def _render_pdf(folder,manifest,output,selected=None):
     return True
 
 
-def main():
+def main(diagnostic=None):
+    diagnostic = diagnostic or current_diagnostic() or Diagnostic(config_root(), VERSION, "cli")
+    with diagnostic_scope(diagnostic):
+        try:
+            return diagnostic.finish(_main())
+        except (Exception, KeyboardInterrupt) as error:
+            diagnostic.failure(error)
+            diagnostic.finish(2)
+            raise
+
+
+def publish_run(output_root, manifest):
+    """Publish a normal run only with a durable initial manifest. Never delete runs."""
+    identifier = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex
+    folder = Path(output_root) / ("run_" + identifier)
+    stage = Path(output_root) / (".pending-run_" + identifier)
+    phase("RUN_CREATE", run_path=str(folder))
+    stage.mkdir(parents=True, exist_ok=False)
+    phase("MANIFEST_WRITE")
+    write_json(stage / "manifest.json", manifest)
+    # Native Windows rename rejects an existing destination. Same volume publication.
+    os.rename(stage, folder)
+    phase("MANIFEST_WRITE", manifest_created=True)
+    return folder
+
+
+def _main():
     configure_console()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version",action="version",version=f"RectoFlow {VERSION}")
@@ -652,6 +685,7 @@ def main():
     if args.export_plan and (not args.rebuild or any((args.paper,args.orientation,args.layout))):
         parser.error("--export-plan erfordert --rebuild und darf nicht mit Format-Overrides kombiniert werden.")
     if args.rebuild:
+        phase("EXPORT", mode="rebuild", run_path=str(args.rebuild.resolve()))
         folder = args.rebuild.resolve()
         from calibration.exports import source_snapshot, create_plan, execute_plan
         manifest,manifest_hash=source_snapshot(folder)
@@ -676,6 +710,7 @@ def main():
     if any((args.paper,args.orientation,args.layout)):
         parser.error("--paper/--orientation/--layout sind fuer --rebuild. Aufnahmeauswahl in --calibrate aendern.")
     profile_snapshot=None
+    phase("CONFIG_LOAD", mode="calibrate" if args.calibrate else "preview" if args.preview else "position" if args.position else "capture")
     if args.profile:
         from calibration.profiles import ProfileStore
         profile_snapshot=ProfileStore(config_root()/"data").snapshot(args.profile,include_templates=not bool(args.calibrate))
@@ -689,9 +724,12 @@ def main():
             config_bytes = config_path.read_bytes()
             cfg = json.loads(config_bytes.decode("utf-8-sig"))
             template_bytes={name:(config_path.parent/name).read_bytes() for name in ("button_enabled.png","button_disabled.png")} if not args.calibrate and cfg["button_mode"]=="template" and navigation(cfg)=="next_button" else {}
+    if current_diagnostic():
+        current_diagnostic().private_values.add(cfg.get("window_title_contains", ""))
     gui = WindowsGUI(cfg, config_path.parent)
     gui.template_bytes={"button_"+key+".png":data for key,data in profile_snapshot["templates"].items()} if profile_snapshot else template_bytes
     if args.calibrate == "interactive":
+        phase("CALIBRATION")
         from calibration.calibration import calibrate
         return calibrate(gui,cfg,config_path,hashlib.sha256(config_bytes).hexdigest(),validate)
     if args.position:
@@ -701,7 +739,9 @@ def main():
             gui.user.GetCursorPos(ctypes.byref(p))
             print(f"x={p.x:5d} y={p.y:5d}", end="\r", flush=True)
             gui.pause(0.15)
+    phase("VALIDATION")
     validate(cfg, gui.size)
+    phase("TARGET_BINDING")
     gui.bind()
     gui.park()
     gui.pause(0.5)
@@ -714,9 +754,10 @@ def main():
         print("Vorlage gespeichert:", path)
         return 0
     output_root = profile_snapshot["output_root"] if profile_snapshot else (config_path.parent / cfg["output_dir"]).resolve()
-    folder = output_root / ("run_" + datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:8])
-    folder.mkdir(parents=True, exist_ok=False)
     if args.preview:
+        phase("RUN_CREATE")
+        folder = output_root / ("preview_" + datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:8])
+        folder.mkdir(parents=True, exist_ok=False)
         image = gui.snapshot()
         save_pair(folder, 1, image, cfg)
         draw = ImageDraw.Draw(image)
@@ -738,6 +779,7 @@ def main():
         return 0 if state != "unknown" else 2
     confirmed_image=None
     if "regions" in cfg or cfg.get("calibration",{}).get("requires_visual_confirmation"):
+        phase("FINAL_CONFIRMATION")
         from calibration.calibration import confirm_capture
         confirmed_image=confirm_capture(gui,cfg)
     manifest = {"schema": 3, "version":VERSION,"status": "RUNNING", "reason": "", "pairs": [], "config": cfg,
@@ -752,21 +794,30 @@ def main():
     from calibration.storage import exclusive
     from calibration.exports import source_snapshot, create_plan, execute_plan
     exit_code = 2
+    folder = publish_run(output_root, manifest)
     with exclusive(folder/".writer.lock"):
-        write_json(folder / "manifest.json", manifest)
         try:
+            phase("FIRST_CAPTURE")
             gui.prepare_button()
             run_capture(gui,cfg,folder,manifest,confirmed_image=confirmed_image)
             manifest["status"]="COMPLETE";exit_code=0
         except (Exception, KeyboardInterrupt) as error:
+            failure(error)
             manifest["status"]="STOPPED";manifest["reason"]=f"{type(error).__name__}: {error}"
             print("ABBRUCH:",manifest["reason"],flush=True)
         finally:
             manifest["finished"]=datetime.now().astimezone().isoformat()
-            write_json(folder/"manifest.json",manifest)
+            try:
+                write_json(folder/"manifest.json",manifest)
+            except (Exception, KeyboardInterrupt) as error:
+                # Preserve the primary capture failure if final persistence also fails.
+                if not current_diagnostic() or not current_diagnostic().data["exception_type"]:
+                    failure(error)
+                raise
     frozen,manifest_hash=source_snapshot(folder)  # capture manifest is now frozen
     try:
         if frozen["pairs"]:
+            phase("EXPORT")
             if cfg.get("confirm_pdf_export",False):
                 from calibration.pdf_export import export_dialog
                 exported=export_dialog(folder,frozen,build_pdf)
@@ -776,6 +827,7 @@ def main():
                 plan=create_plan(folder,expected_manifest_hash=manifest_hash)
                 print("PDF:",execute_plan(folder,plan))
     except (Exception,KeyboardInterrupt) as error:
+        failure(error)
         exit_code=2;print("PDF fehlgeschlagen; Capture bleibt eingefroren:",error,flush=True)
     print("Status:",frozen["status"],"; Ordner:",folder,flush=True)
     return exit_code
