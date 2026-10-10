@@ -18,9 +18,9 @@ def digest(data):return hashlib.sha256(data).hexdigest()
 
 def readable_manifest(manifest):
     schema=manifest.get("schema",1)
-    if schema not in (1,2,3):raise ValueError("Unbekanntes Aufnahmemanifest-Schema.")
+    if schema not in (1,2,3,4):raise ValueError("Unbekanntes Aufnahmemanifest-Schema.")
     if manifest.get("status")=="RUNNING":raise ValueError("RUNNING: Aufnahme nicht abgeschlossen; Wiederherstellung erforderlich.")
-    if schema==3:
+    if schema in (3,4):
         if manifest.get("status") not in ("COMPLETE","STOPPED") or not manifest.get("finished"):
             raise ValueError("Aufnahme ist nicht eingefroren.")
     elif manifest.get("status") not in (None,"COMPLETE","STOPPED","PDF_FAILED"):
@@ -30,6 +30,8 @@ def readable_manifest(manifest):
     if not isinstance(pairs,list):raise ValueError("Ungueltige Ansichten.")
     for index,pair in enumerate(pairs,1):
         if type(pair.get("index")) is not int or pair["index"]!=index:raise ValueError("Ungueltige Ansichtsindizes.")
+        if schema==4:
+            sparse_slots(manifest,pair,index)
 
 
 def source_snapshot(folder):
@@ -42,7 +44,7 @@ def running_state(folder):
     folder=Path(folder)
     manifest=json.loads((folder/"manifest.json").read_bytes())
     if manifest.get("status")!="RUNNING":return manifest.get("status","UNKNOWN")
-    if manifest.get("schema")!=3:return "RECOVERY_REQUIRED: Aktivitaet ungeklaert"
+    if manifest.get("schema") not in (3,4):return "RECOVERY_REQUIRED: Aktivitaet ungeklaert"
     try:
         with exclusive(folder/".writer.lock",timeout=0):return "INTERRUPTED / RECOVERY_REQUIRED"
     except LockBusy:return "RUNNING: Aufnahme aktiv"
@@ -54,6 +56,9 @@ def view_images(folder,manifest,index):
     if type(index) is not int or not 1<=index<=len(manifest["pairs"]):raise ValueError("Ansicht nicht vorhanden.")
     pair=manifest["pairs"][index-1]
     names=image_names(cfg,index);rects=capture_rects(cfg)
+    if manifest.get("schema")==4:
+        slots=sparse_slots(manifest,pair,index)
+        names=[names[i-1] for i in slots];rects=[rects[i-1] for i in slots]
     if pair["index"]!=index or len(pair["images"])!=len(names):raise ValueError("Ungueltige Regionsanzahl.")
     result=[]
     for expected,rect,entry in zip(names,rects,pair["images"]):
@@ -65,6 +70,24 @@ def view_images(folder,manifest,index):
             if decoded.size!=tuple(rect[2:]):raise ValueError("Bildgroesse passt nicht zur Aufnahme.")
             result.append(decoded.convert("RGB"))
     return result
+
+
+def sparse_slots(manifest,pair,index):
+    from .page_layout import policy_for, resolve_view
+    if "page_layout_policy" not in manifest["config"]:raise ValueError("Schema 4 braucht eine Seitenbelegung.")
+    layout=pair.get("layout")
+    if not isinstance(layout,dict) or set(layout)!={"source","is_last"} or type(layout["is_last"]) is not bool:
+        raise ValueError("Ungueltige Seitenbelegungs-Evidenz.")
+    if layout["is_last"] and index!=len(manifest["pairs"]):raise ValueError("Letzte Ansicht ist nicht terminal.")
+    expected=manifest["config"].get("expected_spreads")
+    if expected is not None and layout["is_last"]!=(index==expected):raise ValueError("Letzte Ansicht passt nicht zur erwarteten Anzahl.")
+    slots,evidence=resolve_view(policy_for(manifest["config"]),index,layout["is_last"])
+    actual=pair.get("slots")
+    if actual!=slots or any(type(i) is not int for i in actual) or layout!=evidence:
+        raise ValueError("Seitenbelegung wurde veraendert.")
+    if [entry.get("slot") for entry in pair["images"]]!=slots or any(type(entry.get("slot")) is not int for entry in pair["images"]):
+        raise ValueError("Bild-Slots sind unvollstaendig oder falsch geordnet.")
+    return slots
 
 
 def pdf_options(cfg,overrides=None):

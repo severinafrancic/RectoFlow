@@ -38,7 +38,7 @@ def graphical_core():
             diagnostic.failure(error)
             code = 2
         diagnostic.finish(code)
-        if code != 0:
+        if diagnostic.needs_error_dialog(code):
             show_workflow_error(diagnostic, code)
         return code
 
@@ -58,7 +58,7 @@ def self_check():
 def launcher():
     root=tk.Tk()
     root.title("RectoFlow — Bereiche aufnehmen, PDF erstellen")
-    root.geometry("760x720")
+    root.geometry("760x780")
     selected=tk.StringVar(value=str(core.config_root()/"config.json"))
     ttk.Label(root,text="RectoFlow",font=("Segoe UI",24,"bold"),padding=15).pack(anchor="w")
     ttk.Label(root,text="Ein Bereich oder beliebig viele — Brave, Edge, Firefox und Chrome.\nBereiche ordnen, mit Weiter aufnehmen, Papierformat am Ende waehlen.",padding=12,wraplength=600).pack(anchor="w")
@@ -145,6 +145,21 @@ def launcher():
             except Exception as error:messagebox.showerror("Restore fehlgeschlagen",str(error),parent=win)
         ttk.Button(win,text="Ausgewaehltes Backup wiederherstellen",command=apply).pack(pady=8)
     ttk.Button(root,text="Config-Backups / Wiederherstellen",command=backup_dialog).pack(pady=3)
+    def layout_dialog():
+        import hashlib
+        from calibration.config_io import atomic_update
+        from calibration.page_layout import policy_for, PolicyDialog
+        path=Path(selected.get())
+        try:
+            raw=path.read_bytes();cfg=json.loads(raw.decode("utf-8-sig"))
+            result=PolicyDialog(root,len(core.capture_rects(cfg)),policy_for(cfg),cfg["max_spreads"]).show()
+            if result is None:return
+            candidate={**cfg,"page_layout_policy":result}
+            size=core.WindowsGUI(cfg,path.parent).size
+            atomic_update(path,candidate,hashlib.sha256(raw).hexdigest(),lambda c:core.validate(c,size))
+            messagebox.showinfo("Seitenbelegung gespeichert","Erste/Mittlere/Letzte und Ausnahmen gelten ab dem naechsten Capture. Bereichsgeometrie unveraendert.",parent=root)
+        except Exception as error:messagebox.showerror("Seitenbelegung unveraendert",str(error),parent=root)
+    ttk.Button(root,text="Seitenbelegung / Ausnahmen vor Capture",command=layout_dialog).pack(pady=3)
     buttons=ttk.Frame(root,padding=10)
     buttons.pack(fill="x")
     for title,mode in (("1. Bereiche kalibrieren","--calibrate"),("2. Vorschau pruefen","--preview"),("3. Aufnahme starten","--capture"),("Gespeicherte Bilder als PDF","export")):
@@ -197,7 +212,7 @@ def entrypoint():
             print(f"STOPP: {type(error).__name__}: {error}",file=sys.stderr)
             code = 2
         diagnostic.finish(code)
-        if graphical and code != 0:
+        if graphical and diagnostic.needs_error_dialog(code):
             show_workflow_error(diagnostic, code)
         return code
 

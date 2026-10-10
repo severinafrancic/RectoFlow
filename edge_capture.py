@@ -44,6 +44,10 @@ class StopRun(RuntimeError):
     """Unklarer Zustand oder Benutzerabbruch; niemals als Erfolg behandeln."""
 
 
+class UserCancelled(StopRun):
+    code = "USER_CANCELLED"
+
+
 def box(rect):
     x, y, w, h = rect
     return x, y, x + w, y + h
@@ -129,6 +133,8 @@ def validate(cfg, size):
         rect(value,f"Bereich {index}")
     if len({tuple(r) for r in regions})!=len(regions):
         raise ValueError("Aufnahmebereiche duerfen nicht identisch sein.")
+    from calibration.page_layout import policy_for
+    policy_for(cfg)
     mode=navigation(cfg)
     if mode=="next_button" or cfg.get("button_rect") is not None:
         rect(cfg["button_rect"], "button_rect")
@@ -226,12 +232,12 @@ class WindowsGUI:
 
     def abort_check(self):
         if self.user.GetAsyncKeyState(0x1B) & 0x8001:
-            raise StopRun("ESC: Benutzerabbruch.")
+            raise UserCancelled("ESC: Benutzerabbruch.")
         p = W.POINT()
         if not self.user.GetCursorPos(ctypes.byref(p)):
             raise ctypes.WinError(ctypes.get_last_error())
         if p.x <= 2 and p.y <= 2:
-            raise StopRun("Maus oben links: Benutzerabbruch.")
+            raise UserCancelled("Maus oben links: Benutzerabbruch.")
 
     def pause(self, seconds, *, check_abort=True):
         end = time.monotonic() + seconds
@@ -508,7 +514,7 @@ class WindowsGUI:
         finally:
             root.destroy()
         if answer is None:
-            raise StopRun("Manuelle Aufnahme abgebrochen.")
+            raise UserCancelled("Manuelle Aufnahme abgebrochen.")
         if not answer:
             return False
         print(f"{self.cfg['start_delay']} Sekunden fuer die naechste Ansicht.",flush=True)
@@ -550,35 +556,50 @@ def wait_ready(gui, cfg, previous=None, clock=time.monotonic):
                   "Kein erneuter Klick. progress_rect/Button-Erkennung pruefen.")
 
 
-def save_pair(folder, index, screenshot, cfg):
+def save_pair(folder, index, screenshot, cfg, slots=None, layout=None):
     """Ein Screenshot, alle Crops in expliziter Reihenfolge (legacy: links/rechts)."""
     files = []
-    for filename,rect in zip(image_names(cfg,index),capture_rects(cfg)):
+    active = list(range(1,len(capture_rects(cfg))+1)) if slots is None else slots
+    if not isinstance(active,list) or not active or any(type(i) is not int or not 1<=i<=len(capture_rects(cfg)) for i in active) or active!=sorted(set(active)):
+        raise ValueError("Ungueltige oder leere Capture-Slot-Auswahl.")
+    for slot,(filename,rect) in enumerate(zip(image_names(cfg,index),capture_rects(cfg)),1):
+        if slot not in active:continue
         path = folder / filename
         tmp = path.with_suffix(".png.tmp")
         screenshot.crop(box(rect)).save(tmp, format="PNG")
         os.replace(tmp, path)
-        files.append({"file": filename, "sha256": sha256(path)})
-    return {"index": index, "images": files}
+        files.append({"file": filename, "sha256": sha256(path), **({"slot":slot} if slots is not None else {})})
+    return {"index": index, "images": files, **({"slots":list(slots),"layout":layout} if slots is not None else {})}
 
 
 def run_capture(gui, cfg, folder, manifest, confirmed_image=None):
+    from calibration.page_layout import policy_for, resolve_view
+    sparse = "page_layout_policy" in cfg
+    policy = policy_for(cfg)
     phase("FIRST_CAPTURE")
     image, state, progress = wait_ready(gui, cfg)
     if confirmed_image is not None:
         assert_same_selection(confirmed_image,image,selection(cfg))
     for index in range(1, cfg["max_spreads"] + 1):
+        # Unknown manual length: retain the current physical screenshot in memory
+        # until the existing transition UI tells us whether it is the terminal view.
+        # No provisional PNGs/manifest entries can become artificial pages.
+        transition = None
+        if sparse and cfg["expected_spreads"] is None and navigation(cfg)=="manual":
+            transition = gui.manual_transition()
+        is_last = index == cfg["expected_spreads"] if cfg["expected_spreads"] is not None else state == "disabled" or transition is False
+        slots,layout = resolve_view(policy,index,is_last)
         # Nur komplett gespeicherte Paare ins Manifest aufnehmen.
-        manifest["pairs"].append(save_pair(folder, index, image, cfg))
+        manifest["pairs"].append(save_pair(folder, index, image, cfg,slots,layout) if sparse else save_pair(folder,index,image,cfg))
         write_json(folder / "manifest.json", manifest)
         phase("CAPTURE_LOOP", capture_count=len(manifest["pairs"]))
-        print(f"Ansicht {index}: {len(capture_rects(cfg))} Bereiche gespeichert; Weiter={state}.", flush=True)
+        print(f"Ansicht {index}: {len(slots)} Bereiche gespeichert; Weiter={state}.", flush=True)
         if state == "disabled":
             if cfg["expected_spreads"] is not None and index != cfg["expected_spreads"]:
                 raise StopRun(f"Weiter deaktiviert nach {index} Ansichten; erwartet: {cfg['expected_spreads']}.")
             return
         if navigation(cfg)=="manual":
-            if not gui.manual_transition():
+            if not (gui.manual_transition() if transition is None else transition):
                 if cfg["expected_spreads"] is not None and index!=cfg["expected_spreads"]:
                     raise StopRun("Manuell beendet vor der erwarteten Ansichtsanzahl.")
                 return
@@ -597,9 +618,9 @@ def run_capture(gui, cfg, folder, manifest, confirmed_image=None):
 
 
 def build_pdf(folder, manifest, output):
-    """Legacy export API. Schema 3 must use the persisted ExportPlan renderer."""
-    if manifest.get("schema")==3:
-        raise ValueError("Schema 3 erfordert einen gespeicherten ExportPlan.")
+    """Legacy export API. Schema 3/4 use the persisted ExportPlan renderer."""
+    if manifest.get("schema") in (3,4):
+        raise ValueError("Schema 3/4 erfordert einen gespeicherten ExportPlan.")
     return _render_pdf(folder,manifest,output)
 
 
@@ -690,7 +711,7 @@ def _main():
         from calibration.exports import source_snapshot, create_plan, execute_plan
         manifest,manifest_hash=source_snapshot(folder)
         overrides={key:value for key,value in (("paper_format",args.paper),("paper_orientation",args.orientation),("pdf_layout",args.layout)) if value is not None}
-        if manifest.get("schema")==3 or args.export_plan:
+        if manifest.get("schema") in (3,4) or args.export_plan:
             plan=args.export_plan or create_plan(folder,options=overrides,expected_manifest_hash=manifest_hash)
             print(execute_plan(folder,plan))
             return 0
@@ -783,7 +804,7 @@ def _main():
         phase("FINAL_CONFIRMATION")
         from calibration.calibration import confirm_capture
         confirmed_image=confirm_capture(gui,cfg)
-    manifest = {"schema": 3, "version":VERSION,"status": "RUNNING", "reason": "", "pairs": [], "config": cfg,
+    manifest = {"schema": 4 if "page_layout_policy" in cfg else 3, "version":VERSION,"status": "RUNNING", "reason": "", "pairs": [], "config": cfg,
                 "script_sha256": sha256(Path(__file__)), "started": datetime.now().astimezone().isoformat(),
                 "window_title": gui.title(), "screen_size": gui.size,
                 "python": sys.version, "platform": platform.platform(),
