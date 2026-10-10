@@ -40,13 +40,53 @@ class DOMSession:
         folder=Path(folder); folder.mkdir(parents=True,exist_ok=True)
         path=folder/("session-"+self.token+".html")
         url="javascript:"+quote(snippet(self.token,self.created_ms),safe="")
-        path.write_text('<!doctype html><meta charset="utf-8"><title>RectoFlow HTML-Auswahl</title>'
-            '<h1>Experimentelle HTML-Auswahl</h1><p>Diesen Link in die Lesezeichenleiste ziehen. '
-            'Dann im gewaehlten Browserfenster auf das Lesezeichen klicken. Sitzung: 180 Sekunden.</p>'
-            '<p><a href="'+html.escape(url,quote=True)+'">RectoFlow Auswahl</a></p>'
-            '<p>Bereiche auswaehlen, Ergebnisdatei speichern und in RectoFlow importieren. '
-            'F8 entfernt die Auswahl. Bei blockiertem Bookmarklet manuell fortfahren.</p>',encoding="utf-8")
+        path.write_text(helper_html(url),encoding="utf-8")
         return path
+
+
+def helper_html(url):
+    code=html.escape(url,quote=True)
+    return '''<!doctype html><html lang="de"><meta charset="utf-8">
+<title>RectoFlow HTML-Auswahl</title>
+<style>body{font:17px system-ui;max-width:900px;margin:32px auto;padding:20px;color:#202634}
+button,a{padding:10px}textarea{width:100%;height:130px}aside{background:#eef3ff;padding:16px}</style>
+<h1>HTML-Auswahl als Vorschlag</h1>
+<aside><strong>Manuell ohne HTML:</strong> Zurueck zu RectoFlow wechseln und
+den Button „Manuell ohne HTML“ verwenden. Das funktioniert auch bei blockiertem Bookmarklet.</aside>
+<h2>Edge: ohne sichtbare Favoritenleiste</h2>
+<ol><li>„Bookmarklet kopieren“ anklicken.</li>
+<li>Im Zielbrowser einen Favoriten anlegen. Im Favoritenmenue den Favoriten bearbeiten:
+Name „RectoFlow Auswahl“, URL durch den vollstaendigen Code unten ersetzen (einschliesslich javascript:).</li>
+<li>Zum Buch-/Zieltab wechseln und „RectoFlow Auswahl“ im Favoritenmenue auswaehlen.
+Die Favoritenleiste muss dabei nicht sichtbar sein.</li>
+<li>Bereiche auswaehlen, Ergebnisdatei speichern und in RectoFlow „Ergebnis importieren“ anklicken.</li></ol>
+<p>Die Sitzung gilt 180 Sekunden ab Erstellung. Bei Ablauf eine neue Hilfsseite starten.
+F8 / Abbrechen entfernt den Picker. Kein Code-Einfuegen in DevTools erforderlich.</p>
+<button id="copy" type="button">Bookmarklet kopieren</button>
+<span id="status" role="status"></span>
+<p>Vollstaendiger Bookmarklet-Code (auch manuell auswaehlbar):</p>
+<textarea id="code" readonly spellcheck="false">'''+code+'''</textarea>
+<p>Optional bei sichtbarer Leiste: <a href="'''+code+'''">RectoFlow Auswahl</a> als Favoriten ablegen.</p>
+<p>HTML wird nie automatisch akzeptiert. Danach folgen der normale Region-Editor,
+Live-Vorschau und ausdrueckliche Bestaetigung.</p>
+<script>
+document.getElementById('copy').addEventListener('click', async function () {
+  const code = document.getElementById('code');
+  const status = document.getElementById('status');
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(code.value);
+    } else {
+      code.focus(); code.select();
+      if (!document.execCommand('copy')) throw new Error('copy blocked');
+    }
+    status.textContent = 'Kopiert. Jetzt den Favoriten bearbeiten.';
+  } catch (_) {
+    code.focus(); code.select();
+    status.textContent = 'Automatisches Kopieren blockiert. Markierten Code mit Strg+C kopieren.';
+  }
+});
+</script></html>'''
 
 from PIL import Image, ImageChops
 from .geometry import CalibrationError, css_to_screen, measured_mapping, validate_rect

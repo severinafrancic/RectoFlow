@@ -31,26 +31,32 @@ def initial_rects(cfg,bounds):
 def choose_dom(root,token):
     win=tk.Toplevel(root)
     win.title("Stufe A: DOM-Auswahl (optional)")
-    win.geometry("740x430")
+    win.geometry("780x470")
     result={"mode":"cancel","copied":False}
     text=("Standard: Bereiche direkt im Screenshot markieren.\n\n"
           "Optional: HTML-Auswahl als Startvorschlag (experimentell).\n"
-          "Hilfsseite oeffnen, Link in die Lesezeichenleiste ziehen, im Zieltab ausfuehren.\n"
+          "Hilfsseite oeffnen und dort 'Bookmarklet kopieren' anklicken.\n"
+          "In Edge einen Favoriten anlegen/bearbeiten und dessen URL durch den Code ersetzen.\n"
+          "Im Zieltab den Favoriten ueber das Favoritenmenue ausfuehren; die Leiste ist optional.\n"
           "Ergebnisdatei speichern und hier importieren. Sitzung gilt 180 Sekunden.\n"
           "F8 / Abbrechen entfernt den Browser-Picker. Wenn das Bookmarklet blockiert\n"
-          "wird, manuell fortfahren. Die Zwischenablage wird nicht verwendet.")
+          "wird, 'Manuell ohne HTML' verwenden. Kopieren nur nach Ihrem Klick auf der Hilfsseite.")
     ttk.Label(win,text=text,wraplength=710,padding=15,justify="left").pack(fill="both",expand=True)
     frame=ttk.Frame(win,padding=10)
     frame.pack(fill="x")
     session=None
-    def copied():
+    def open_helper():
         nonlocal session
-        if session: session.cancel()
-        session=DOMSession()
-        import edge_capture
-        path=session.write_helper(edge_capture.config_root()/"data"/"sessions")
-        result["copied"]=True  # browser cleanup needed, no clipboard activity
-        webbrowser.open(path.as_uri())
+        try:
+            if session: session.cancel()
+            session=DOMSession()
+            import edge_capture
+            path=session.write_helper(edge_capture.config_root()/"data"/"sessions")
+            result["copied"]=True  # browser cleanup needed, no clipboard activity
+            if not webbrowser.open(path.as_uri()):
+                messagebox.showwarning("Hilfsseite",f"Hilfsseite manuell im Browser oeffnen:\n{path}\nManuell ohne HTML bleibt moeglich.",parent=win)
+        except (OSError,CalibrationError) as error:
+            messagebox.showwarning("Hilfsseite",str(error)+"\nManuell ohne HTML bleibt moeglich.",parent=win)
     def accept():
         try:
             if session is None: raise CalibrationError("DOM_PICKER_FAILED","Zuerst eine Sitzung starten.")
@@ -59,15 +65,15 @@ def choose_dom(root,token):
             result["payload"]=session.import_file(path)
             result["mode"]="dom"
             win.destroy()
-        except (tk.TclError,CalibrationError) as error:
+        except (OSError,tk.TclError,CalibrationError) as error:
             messagebox.showwarning("DOM_PICKER_FAILED",f"{error}\nManuelle Auswahl bleibt moeglich.",parent=win)
     def manual():
         result["mode"]="manual"
         win.destroy()
     def cancel():
         win.destroy()
-    ttk.Button(frame,text="Manuell ohne DOM",command=manual).pack(side="left",padx=3)
-    ttk.Button(frame,text="HTML-Hilfsseite",command=copied).pack(side="left",padx=3)
+    ttk.Button(frame,text="Manuell ohne HTML",command=manual).pack(side="left",padx=3)
+    ttk.Button(frame,text="HTML-Hilfsseite",command=open_helper).pack(side="left",padx=3)
     ttk.Button(frame,text="Ergebnis importieren",command=accept).pack(side="left",padx=3)
     ttk.Button(frame,text="Abbrechen",command=cancel).pack(side="left",padx=3)
     win.bind("<Escape>",lambda e:cancel())
