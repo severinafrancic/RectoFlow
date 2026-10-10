@@ -9,7 +9,7 @@
   if (window[key]) window[key].cleanup();
   const abort = new AbortController();
   const names = ['PAGES', 'NEXT', 'PROGRESS'];
-  const colors = [[239,17,131], [17,239,131], [131,17,239]];
+  const colors = [[239,17,131], [17,239,131], [131,17,239], [239,131,17]];
   const chosen = {};
   const candidates = [];
   let step = 0, ready = false, hovered = null, timeout;
@@ -70,10 +70,60 @@
       Object.assign(highlight.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px'});
     }
   }
+  function pageElement(el) {
+    return el?.closest?.('[data-page-wrapper]') || el;
+  }
+  function visibleRect(el) {
+    if (!el || el === host) return null;
+    const r=el.getBoundingClientRect();
+    let l=Math.max(0,r.left),t=Math.max(0,r.top),b=Math.min(innerHeight,r.bottom),right=Math.min(innerWidth,r.right);
+    for(let node=el;node;node=node.parentElement || node.getRootNode?.().host) {
+      const s=getComputedStyle(node);
+      if(s.display==='none'||s.visibility==='hidden'||s.visibility==='collapse'||Number(s.opacity)===0||s.contentVisibility==='hidden'||node.hidden) return null;
+      if(node!==el && /(hidden|clip|scroll|auto)/.test(s.overflowX+' '+s.overflowY)) {
+        const clip=node.getBoundingClientRect();
+        if(/(hidden|clip|scroll|auto)/.test(s.overflowX)){l=Math.max(l,clip.left);right=Math.min(right,clip.right);}
+        if(/(hidden|clip|scroll|auto)/.test(s.overflowY)){t=Math.max(t,clip.top);b=Math.min(b,clip.bottom);}
+      }
+    }
+    if(right<=l || b<=t) return null;
+    // Check actual paint hit-test as well as styles. The own transparent shield
+    // is temporarily excluded; page overlays inside a wrapper count as the page.
+    const positions=[[.5,.5],[.25,.25],[.75,.25],[.25,.75],[.75,.75]];
+    if(!positions.some(([x,y])=>{const hit=elementAt(l+(right-l)*x,t+(b-t)*y);return hit && (hit===el||el.contains(hit));}))return null;
+    return {left:l,top:t,right,bottom:b,width:right-l,height:b-t};
+  }
+  function roots() {
+    const found=[document];
+    for(let i=0;i<found.length;i++) for(const el of found[i].querySelectorAll('*'))
+      if(el!==host && el.shadowRoot)found.push(el.shadowRoot);
+    return found;
+  }
+  function detectPages() {
+    let pages=[];
+    for(const root of roots()) {
+      const wrappers=[...root.querySelectorAll('[data-page-wrapper]')];
+      const elements=wrappers.length?wrappers:[...root.querySelectorAll('img[alt]')].filter(el=>/^Seite\b/i.test(el.alt));
+      for(const el of elements) {const r=visibleRect(el);if(r && !pages.some(p=>JSON.stringify(p)===JSON.stringify(r)))pages.push(r);}
+    }
+    // Only an unambiguous horizontal row is sorted. Overlapping layouts retain
+    // DOM order and are explicitly editable proposals, not LEFT/RIGHT truth.
+    if(pages.every((a,i)=>pages.slice(i+1).every(b=>a.right<=b.left || b.right<=a.left)))pages.sort((a,b)=>a.left-b.left);
+    return pages.slice(0,64);
+  }
+  function detectNext() {
+    for(const root of roots()) {
+      const buttons=[...root.querySelectorAll('button,[role="button"]')];
+      const matches=buttons.filter(el=>el.getAttribute('data-testid')==='dua-navi-vor' || /^(Nächste Seite|Naechste Seite|Next(?: page)?|Weiter)$/i.test(el.getAttribute('aria-label')||''));
+      const visible=matches.map(visibleRect).filter(Boolean);
+      if(visible.length===1)return visible[0];
+    }
+    return null;
+  }
   function choose(el) {
     if (!el || ready) return;
-    const r = el.getBoundingClientRect();
-    const rect = {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};
+    const rect=visibleRect(step===0?pageElement(el):el.closest?.('button,[role="button"]')||el);
+    if(!rect)return;
     if (step === 0) {
       if (candidates.length >= 64) return;
       // Multiple clicked pages remain in explicit selection order, never x/y sort.
@@ -95,16 +145,21 @@
   }
   function finish() {
     ready = true; hovered = null; highlight.hidden = true; skip.hidden = true; copyButton.hidden = false;
-    const positions = [[24,72],[innerWidth-48,72],[24,innerHeight-48]];
+    const positions = [[24,72],[innerWidth-56,72],[24,innerHeight-56],[innerWidth-56,innerHeight-56]];
     if (innerWidth < 180 || innerHeight < 180 || (visualViewport && visualViewport.scale !== 1)) return invalidate();
     positions.forEach((p,i) => {
       const marker = document.createElement('div');
-      marker.style.cssText = `position:fixed;left:${p[0]}px;top:${p[1]}px;width:24px;height:24px;border:2px solid black;box-sizing:border-box;background:rgb(${colors[i].join(',')});pointer-events:none;z-index:5!important;`;
+      marker.style.cssText = `all:initial;position:fixed;left:${p[0]}px;top:${p[1]}px;width:32px;height:32px;background:rgb(${colors[i].join(',')});pointer-events:none;z-index:5!important;`;
+      // A colored 8x8-cell perimeter plus 36 interior bits. Four 32-bit pieces
+      // encode the complete session token; the fixed prefix binds orientation.
+      const word=parseInt(token.slice(i*8,i*8+8),16)>>>0;
+      const bits=[1,0,0,1,...Array.from({length:32},(_,j)=>(word>>>(31-j))&1)];
+      bits.forEach((bit,j)=>{const cell=document.createElement('span');cell.style.cssText=`all:initial;position:absolute;left:${4+(j%6)*4}px;top:${4+Math.floor(j/6)*4}px;width:4px;height:4px;background:${bit?'white':'black'};`;marker.append(cell);});
       shadow.append(marker); markers.push(marker);
     });
-    const result = {schema:2,token,created_ms:created,dpr:devicePixelRatio,candidates,
+    const result = {schema:3,token,created_ms:created,dpr:devicePixelRatio,candidates,
       viewport:[innerWidth,innerHeight],scroll:[scrollX,scrollY],visual_scale:visualViewport?.scale || 1,
-      markers:positions.map((p,i)=>({css_center:[p[0]+12,p[1]+12],color:colors[i]})),rects:chosen};
+      markers:positions.map((p,i)=>({css_center:[p[0]+16,p[1]+16],color:colors[i]})),rects:chosen};
     textarea.value = JSON.stringify(result); textarea.hidden = false;
     line.textContent = 'Ergebnisdatei speichern und in RectoFlow importieren. F8 entfernt jetzt alles.';
   }
@@ -154,5 +209,7 @@
   highlight.style.zIndex='2';
   beacon.style.zIndex='4';
   timeout = setTimeout(cleanup, Math.max(0,180000-(Date.now()-created)));
+  candidates.push(...detectPages());
+  const autoNext=detectNext();if(autoNext)chosen.NEXT=autoNext;
   update();
 })();

@@ -132,11 +132,11 @@ for(const count of [1,2,4]) {
  const nodes=[];let target;
  class El {constructor(tag){this.tag=tag;this.style={};this.children=[];this.events={};nodes.push(this);}
  append(...children){this.children.push(...children);} attachShadow(){this.shadow=new El('shadow');return this.shadow;}
- addEventListener(name,fn){this.events[name]=fn;} remove(){} getBoundingClientRect(){return target;}}
+ addEventListener(name,fn){this.events[name]=fn;} remove(){} getBoundingClientRect(){return target;} contains(){return true;} querySelectorAll(){return [];}}
  const doc=new El('document');doc.documentElement=new El('html');doc.createElement=tag=>new El(tag);doc.elementFromPoint=()=>new El('page');
  const win=new El('window');win.top=win;
  const context={window:win,document:doc,Element:El,Date,AbortController,setTimeout:()=>1,clearTimeout(){},innerWidth:800,innerHeight:600,
-                devicePixelRatio:1.25,scrollX:0,scrollY:200,visualViewport:{scale:1}};
+                devicePixelRatio:1.25,scrollX:0,scrollY:200,visualViewport:{scale:1},getComputedStyle:()=>({opacity:'1',display:'block',visibility:'visible'})};
  vm.runInNewContext(SCRIPT,context);
  const shield=nodes.find(n=>n.style.cssText?.includes('background:transparent'));
  const skip=nodes.find(n=>n.tag==='button'&&n.textContent.includes('Seiten fertig'));
@@ -144,10 +144,10 @@ for(const count of [1,2,4]) {
  for(let i=0;i<count;i++) {target={left:10+i*100,top:120,right:90+i*100,bottom:300,width:80,height:180};shield.events.click(event);}
  for(let i=0;i<3;i++)skip.events.click(event);
  const result=JSON.parse(nodes.find(n=>n.tag==='textarea').value);
- if(result.schema!==2||result.candidates.length!==count||'LEFT' in result.rects||'RIGHT' in result.rects)throw Error('candidate contract');
- const markers=nodes.filter(n=>n.style.cssText?.includes('width:24px'));
+ if(result.schema!==3||result.candidates.length!==count||'LEFT' in result.rects||'RIGHT' in result.rects)throw Error('candidate contract');
+ const markers=nodes.filter(n=>n.style.cssText?.includes('width:32px'));
  const panel=nodes.find(n=>n.style.cssText?.includes('max-width:440px'));
- if(markers.length!==3||panel.style.zIndex!=='3'||markers.some(m=>!m.style.cssText.includes('z-index:5!important')))throw Error('marker behind panel');
+ if(markers.length!==4||markers.some(m=>m.children.length!==36)||panel.style.zIndex!=='3'||markers.some(m=>!m.style.cssText.includes('z-index:5!important')))throw Error('marker behind panel');
 }
 console.log('DOM_CANDIDATES_AND_MARKER_STACKING_PASS');'''.replace("SCRIPT",json.dumps(snippet("tests",int(core.time.time()*1000))))
         result=subprocess.run([node],input=harness,text=True,capture_output=True,timeout=15)
