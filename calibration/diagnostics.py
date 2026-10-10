@@ -90,13 +90,23 @@ class Diagnostic:
         return code
 
     def write(self):
+        # Even unavailable temp resolution/serialization must not mask a workflow error.
+        try:
+            self._write()
+        except Exception:
+            self.log_path = None
+
+    def _write(self):
         self.data["timestamp"] = datetime.now().astimezone().isoformat()
         filename = "rectoflow-" + self.data["diagnostic_id"] + ".jsonl"
-        destinations = [self.log_path] if self.log_path else []
-        destinations += [self.root / "data" / "logs" / filename,
-                         Path(tempfile.gettempdir()) / "RectoFlow-logs" / filename]
-        for path in dict.fromkeys(destinations):
+        destinations = [lambda:self.log_path, lambda:self.root / "data" / "logs" / filename,
+                        lambda:Path(tempfile.gettempdir()) / "RectoFlow-logs" / filename]
+        attempted=set()
+        for destination in destinations:
             try:
+                path=destination()
+                if path is None or path in attempted:continue
+                attempted.add(path)
                 path.parent.mkdir(parents=True, exist_ok=True)
                 with path.open("a", encoding="utf-8") as stream:
                     stream.write(json.dumps(self.data, ensure_ascii=False) + "\n")

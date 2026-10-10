@@ -746,6 +746,7 @@ def _main():
     gui.park()
     gui.pause(0.5)
     if args.calibrate in ("enabled","disabled"):
+        phase("CALIBRATION")
         from io import BytesIO
         from calibration.config_io import record_template
         data=BytesIO()
@@ -809,6 +810,10 @@ def _main():
             manifest["finished"]=datetime.now().astimezone().isoformat()
             try:
                 write_json(folder/"manifest.json",manifest)
+                diagnostic=current_diagnostic()
+                if diagnostic:
+                    diagnostic.data["capture_count"]=len(manifest["pairs"])
+                    diagnostic.write()
             except (Exception, KeyboardInterrupt) as error:
                 # Preserve the primary capture failure if final persistence also fails.
                 if not current_diagnostic() or not current_diagnostic().data["exception_type"]:

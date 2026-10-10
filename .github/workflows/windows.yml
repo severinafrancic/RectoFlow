@@ -28,11 +28,21 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tests/native_review_smoke.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/native_editor_smoke.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/generate_readme_assets.py --check
       - name: Build and check portable Windows executable
         run: python scripts/build_windows.py
       - name: Relocated executable and PDF integrity smoke test
         run: python tests/frozen_smoke.py
+      - name: Unpublished owner-test bundle and exact ZIP smoke
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: |
+          python scripts/build_windows.py --owner-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/frozen_smoke.py --archive .build-v021/owner-test/RectoFlow-owner-test-windows-x64.zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: RectoFlow-windows-x64

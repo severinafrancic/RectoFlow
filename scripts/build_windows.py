@@ -1,5 +1,6 @@
 """Build and validate a portable Windows ZIP inside the canonical checkout."""
 from pathlib import Path
+import argparse
 import hashlib
 import importlib.metadata
 import json
@@ -42,8 +43,17 @@ def notices(destination):
 
 
 def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--owner-test",action="store_true",help="Unpublished owner-test package inside .build-v021")
+    args=parser.parse_args()
     if sys.platform!="win32":raise RuntimeError("Windows build requires native Windows.")
-    dist=ROOT/".build-dist"
+    revision=subprocess.run(["git","rev-parse","HEAD"],cwd=ROOT,capture_output=True,text=True,check=True).stdout.strip()
+    tree=subprocess.run(["git","rev-parse","HEAD^{tree}"],cwd=ROOT,capture_output=True,text=True,check=True).stdout.strip()
+    dirty=subprocess.run(["git","status","--porcelain"],cwd=ROOT,capture_output=True,text=True,check=True)
+    if args.owner_test and dirty.stdout.strip():raise RuntimeError("Owner-test build requires a clean committed subject.")
+    dist=ROOT/".build-v021"/"owner-test" if args.owner_test else ROOT/".build-dist"
+    if args.owner_test and (dist/"RectoFlow").exists():
+        raise RuntimeError("Owner-test bundle already exists. Preserve previous evidence before building a new subject.")
     arguments=[sys.executable,"-m","PyInstaller","--noconfirm","--onedir","--console","--name","RectoFlow",
         "--distpath",str(dist),"--workpath",str(ROOT/".build-windows"),"--specpath",str(ROOT/".build-spec"),
         "--collect-submodules","uiautomation","--collect-all","reportlab",
@@ -71,19 +81,24 @@ def main():
     source_files=[ROOT/"edge_capture.py",ROOT/"rectoflow.py",*sorted((ROOT/"calibration").glob("*.py")),*sorted((ROOT/"calibration").glob("*.js"))]
     hashes={p.relative_to(ROOT).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in source_files}
     code_hash=hashlib.sha256("".join(f"{n}\t{hashes[n]}\n" for n in sorted(hashes)).encode()).hexdigest()
-    revision=subprocess.run(["git","rev-parse","HEAD"],cwd=ROOT,capture_output=True,text=True)
     dirty=subprocess.run(["git","status","--porcelain"],cwd=ROOT,capture_output=True,text=True,check=True)
-    (folder/"BUILD_METADATA.json").write_text(json.dumps({"version":VERSION,"source_commit":revision.stdout.strip() if revision.returncode==0 else None,
+    if args.owner_test and dirty.stdout.strip():raise RuntimeError("Source changed during owner-test build.")
+    if subprocess.run(["git","rev-parse","HEAD"],cwd=ROOT,capture_output=True,text=True,check=True).stdout.strip()!=revision:
+        raise RuntimeError("Subject changed during build.")
+    (folder/"BUILD_METADATA.json").write_text(json.dumps({"version":VERSION,"source_commit":revision,"source_tree":tree,
+        "build_kind":"owner-test" if args.owner_test else "portable", "producer_role":"BUILDER",
         "working_tree_dirty":bool(dirty.stdout.strip()),"code_tree_sha256":code_hash,"files":hashes,"python":sys.version.split()[0]},indent=2),encoding="utf-8")
-    artifacts=ROOT/"artifacts"
+    artifacts=dist if args.owner_test else ROOT/"artifacts"
     artifacts.mkdir(exist_ok=True)
-    output=artifacts/f"RectoFlow-{VERSION}-windows-x64.zip"
+    output=artifacts/("RectoFlow-owner-test-windows-x64.zip" if args.owner_test else f"RectoFlow-{VERSION}-windows-x64.zip")
     with zipfile.ZipFile(output,"w",zipfile.ZIP_DEFLATED) as z:
         for path in sorted(folder.rglob("*")):
             if path.is_file():z.write(path,arcname="RectoFlow/"+path.relative_to(folder).as_posix())
     with zipfile.ZipFile(output) as z:
         if z.testzip():raise RuntimeError("ZIP integrity failed.")
-    print(json.dumps({"artifact":str(output),"sha256":hashlib.sha256(output.read_bytes()).hexdigest(),"self_check":info},indent=2))
+    print(json.dumps({"artifact":str(output),"sha256":hashlib.sha256(output.read_bytes()).hexdigest(),
+        "exe":str(folder/"RectoFlow.exe"),"exe_sha256":hashlib.sha256((folder/"RectoFlow.exe").read_bytes()).hexdigest(),
+        "subject":revision,"tree":tree,"self_check":info},indent=2))
 
 
 if __name__=="__main__":main()

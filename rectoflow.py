@@ -158,6 +158,7 @@ def launcher():
             name=filedialog.askopenfilename(title="manifest.json eines Aufnahmelaufs waehlen",filetypes=[("Aufnahmemanifest","manifest.json")],parent=dialog)
         finally:dialog.destroy()
         if not name:return 0
+        if current():current().phase("EXPORT",run_path=str(Path(name).parent))
         from calibration.pdf_export import export_dialog
         path=Path(name)
         from calibration.exports import running_state

@@ -37,8 +37,8 @@ class RectanglePicker:
         self.window.state("zoomed")
         self.window.protocol("WM_DELETE_WINDOW", self.cancel)
         self.window.bind("<Escape>", lambda e:self.cancel())
-        self.window.bind("<Delete>", lambda e:self.delete())
-        self.window.bind("<Return>", lambda e:self.accept())
+        self.window.bind("<Delete>", lambda e:self.editor_shortcut(e,self.delete))
+        self.window.bind("<Return>", lambda e:self.editor_shortcut(e,self.accept))
         for key in ("Left", "Right", "Up", "Down"):
             self.window.bind("<"+key+">",self.key_move)
             self.window.bind("<Shift-"+key+">",self.key_move)
@@ -428,6 +428,12 @@ class RectanglePicker:
     def history_key(self,event,redo):
         if isinstance(event.widget,(tk.Entry,ttk.Entry,ttk.Combobox,tk.Text,tk.Spinbox,ttk.Spinbox)):return
         self.redo() if redo else self.undo()
+        return "break"
+
+    @staticmethod
+    def editor_shortcut(event,action):
+        if isinstance(event.widget,(tk.Entry,ttk.Entry,ttk.Combobox,tk.Text,tk.Spinbox,ttk.Spinbox)):return
+        action()
         return "break"
 
     @staticmethod

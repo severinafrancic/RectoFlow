@@ -155,6 +155,20 @@ class GraphicalTests(unittest.TestCase):
                 diagnostic.failure(ValueError("original"));diagnostic.finish(2)
             self.assertIsNone(diagnostic.log_path)
             self.assertIn("original",diagnostic.dialog_text(2))
+            with patch("calibration.diagnostics.tempfile.gettempdir",side_effect=FileNotFoundError("no temp")):
+                diagnostic=Diagnostic(root,core.VERSION,"gui")
+                diagnostic.failure(ValueError("primary"));diagnostic.finish(2)
+            self.assertIn("primary",diagnostic.dialog_text(2))
+
+    def test_secondary_persistence_error_does_not_replace_primary_failure(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as td:
+            diagnostic=Diagnostic(td,core.VERSION,"gui")
+            diagnostic.phase("FIRST_CAPTURE")
+            diagnostic.failure(ValueError("primary capture failure"))
+            diagnostic.phase("MANIFEST_WRITE")
+            diagnostic.failure(OSError("secondary write failure"))
+            self.assertEqual(diagnostic.data["exception_type"],"ValueError")
+            self.assertIn("Phase: FIRST_CAPTURE",diagnostic.dialog_text(2))
 
     def test_private_strings_and_source_lines_are_not_logged(self):
         with tempfile.TemporaryDirectory(dir=SCRATCH) as td:

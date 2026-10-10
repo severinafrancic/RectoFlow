@@ -1,5 +1,6 @@
 """Actual relocated EXE imports and PDF export, no browser/desktop acquisition."""
 from pathlib import Path
+import argparse
 import json
 import os
 import subprocess
@@ -23,9 +24,12 @@ def run(exe,*args):
 
 
 def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--archive",type=Path,default=ROOT/"artifacts"/f"RectoFlow-{core.VERSION}-windows-x64.zip")
+    args=parser.parse_args()
     scratch=ROOT/".build-release-smoke"
     scratch.mkdir(exist_ok=True)
-    archive=ROOT/"artifacts"/f"RectoFlow-{core.VERSION}-windows-x64.zip"
+    archive=args.archive
     with tempfile.TemporaryDirectory(dir=scratch) as tmp:
         folder=Path(tmp)
         with zipfile.ZipFile(archive) as z:
@@ -37,7 +41,18 @@ def main():
         check=json.loads(run(exe,"--self-check"))
         assert check["frozen"] and check["architecture"]==64
         assert Path(check["config_root"])==exe.parent
+        metadata=json.loads((exe.parent/"BUILD_METADATA.json").read_bytes())
+        subject=subprocess.run(["git","rev-parse","HEAD"],cwd=ROOT,capture_output=True,text=True,check=True).stdout.strip()
+        assert metadata["source_commit"]==subject and not metadata["working_tree_dirty"]
+        for name,expected in metadata["files"].items():
+            assert core.sha256(ROOT/name)==expected
+            assert core.sha256(exe.parent/"_internal"/name)==expected
         assert run(exe,"--version").strip()==f"RectoFlow {core.VERSION}"
+        # Real frozen CLI error must return 2 without hanging on a GUI dialog.
+        failed=subprocess.run([str(exe),"--config",str(folder/"missing-config.json")],cwd=exe.parent,capture_output=True,text=True,timeout=15)
+        assert failed.returncode==2 and "STOPP:" in failed.stderr
+        logs=list((exe.parent/"data"/"logs").glob("*.jsonl"))
+        assert any(json.loads(p.read_text().splitlines()[-1])["phase"]=="CONFIG_LOAD" for p in logs)
         assert "--rebuild" in run(exe,"--help")
         cfg=json.loads((ROOT/"config.json").read_text())
         cfg.update(regions=[[20,50,180,250],[240,50,200,210],[480,50,160,240]],navigation_mode="none",paper_format="A4")
