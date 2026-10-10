@@ -11,6 +11,7 @@ from .geometry import magnifier_pixels, magnifier_position, adjacent_rect
 from .regions import capture_names, NAVIGATION
 
 COLORS = {"LEFT":"#ff5252", "RIGHT":"#4ca6ff", "NEXT":"#41ef92", "PROGRESS":"#ffcf48"}
+HANDLE_ORDER=("nw","n","ne","e","se","s","sw","w","MOVE")
 
 
 class RectanglePicker:
@@ -115,12 +116,21 @@ class RectanglePicker:
         self.canvas.bind("<ButtonPress-1>",self.press)
         self.canvas.bind("<B1-Motion>",self.motion)
         self.canvas.bind("<ButtonRelease-1>",self.release)
+        self.canvas.bind("<Tab>",lambda e:self.cycle_handle(1))
+        self.canvas.bind("<Shift-Tab>",lambda e:self.cycle_handle(-1))
+        self.handle_var=tk.StringVar(value="MOVE")
+        handlebar=ttk.Frame(self.window,padding=6);handlebar.pack(side="top",fill="x",before=workspace)
+        ttk.Label(handlebar,text="Handle:").pack(side="left")
+        handle_choice=ttk.Combobox(handlebar,textvariable=self.handle_var,values=[h.upper() for h in HANDLE_ORDER],state="readonly",width=6)
+        handle_choice.pack(side="left")
+        handle_choice.bind("<<ComboboxSelected>>",lambda e:self.activate_handle(self.handle_var.get()))
         self.transform = (1,0,0)
         self.photo = None
         self.refresh_selector()
         self.paper_changed()
         self.window.update_idletasks()
         self.window.focus_force()
+        self.canvas.focus_set()
 
     def select(self,name):
         self.selected, self.mode = name, "edit"
@@ -322,14 +332,32 @@ class RectanglePicker:
             if name == self.selected and not self.is_locked():
                 for handle,(px,py) in self.handles(rect).items():
                     cx,cy=ox+px*s,oy+py*s
-                    self.canvas.create_rectangle(cx-4,cy-4,cx+4,cy+4,fill="white" if handle==self.active_handle else color,outline="#111")
+                    self.canvas.create_rectangle(cx-6,cy-6,cx+6,cy+6,fill="white" if handle==self.active_handle else color,outline="#111")
         if self.point:
             x,y=ox+self.point[0]*s,oy+self.point[1]*s
             self.canvas.create_line(x-9,y,x+9,y,fill=COLORS["NEXT"],width=2)
             self.canvas.create_line(x,y-9,x,y+9,fill=COLORS["NEXT"],width=2)
         self.render_magnifier(width,height)
         mode="Groesse fixiert: nur verschieben" if self.is_locked() else "ziehen/8 Griffe"
-        self.status.set(f"{self.display_name(self.selected)}: {mode} | Pfeil 1 px / Shift 10 px | ESC = Abbrechen")
+        active=(getattr(self,"active_handle",None) or "MOVE").upper()
+        if hasattr(self,"handle_var"):self.handle_var.set(active)
+        self.status.set(f"{self.display_name(self.selected)} — Handle: {active} | {mode} | Tab: Handle | Pfeil 1 px / Shift 10 px")
+
+    def activate_handle(self,handle):
+        handle=handle.lower() if handle!="MOVE" else "MOVE"
+        self.active_handle=None if handle=="MOVE" or self.is_locked() else handle
+        rect=self.rects.get(self.selected)
+        self.magnifier_point=self.handles(rect)[self.active_handle] if rect and self.active_handle else None
+        if hasattr(self,"canvas"):self.canvas.focus_set()
+        self.render()
+
+    def cycle_handle(self,direction):
+        if self.is_locked():
+            self.activate_handle("MOVE")
+        else:
+            active=getattr(self,"active_handle",None) or "MOVE"
+            self.activate_handle(HANDLE_ORDER[(HANDLE_ORDER.index(active)+direction)%len(HANDLE_ORDER)])
+        return "break"
 
     def is_locked(self):
         return self.selected in getattr(self,"locked",set())
@@ -458,8 +486,10 @@ class RectanglePicker:
             return
         handle=None
         if rect and self.mode != "draw" and not self.is_locked():
-            radius=8/self.transform[0]
-            handle=next((name for name,pos in self.handles(rect).items() if abs(p[0]-pos[0])<=radius and abs(p[1]-pos[1])<=radius),None)
+            radius=12/self.transform[0]
+            # Corners win before edges, independent of dictionary iteration.
+            handles=self.handles(rect)
+            handle=next((name for name in ("nw","ne","se","sw","n","e","s","w") if abs(p[0]-handles[name][0])<=radius and abs(p[1]-handles[name][1])<=radius),None)
         if not handle and self.mode!="draw":
             hits=[n for n,r in self.rects.items() if r and contains(r,p)]
             if hits and self.selected not in hits:
