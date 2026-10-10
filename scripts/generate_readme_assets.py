@@ -129,6 +129,9 @@ def calibration_asset(output):
                  'NEXT': [790, 475, 170, 50], 'PROGRESS': [36, 475, 234, 40]}
         with patch('calibration.screenshot_picker.tk.Toplevel', side_effect=normal):
             picker = RectanglePicker(root, document(), rects, [875, 500], [0, 0, 1000, 560], final=True)
+        # Tk's default maxsize follows the current desktop; the owned client
+        # render must keep its fixed fixture dimensions even on a small monitor.
+        picker.window.maxsize(4096,4096)
         picker.window.geometry('1280x820+0+0'); banner(picker.window)
         picker.window.update(); picker.render(); picker.window.update()
         assert len(picker.handles(REGIONS[0])) == 8
@@ -168,6 +171,7 @@ def review_asset(output):
             root = actual_tk(); style(root)
             def drive():
                 try:
+                    root.maxsize(4096,4096)
                     root.geometry('1080x780+0+0'); banner(root); root.update()
                     listing = next(w for w in widgets(root) if isinstance(w, ttk.Treeview))
                     for index in ('1', '3', '2'):
